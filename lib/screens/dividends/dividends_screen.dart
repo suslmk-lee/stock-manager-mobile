@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/dividend.dart';
 import '../../providers/dividend_provider.dart';
@@ -58,10 +59,7 @@ class _DividendsScreenState extends ConsumerState<DividendsScreen>
       ),
       body: TabBarView(
         controller: _tabController,
-        children: const [
-          _HistoryTab(),
-          _AnalysisTab(),
-        ],
+        children: const [_HistoryTab(), _AnalysisTab()],
       ),
       floatingActionButton: _currentTab == 0
           ? FloatingActionButton(
@@ -95,7 +93,9 @@ class _HistoryTab extends ConsumerWidget {
           // 요약 카드
           statsAsync.when(
             loading: () => const SizedBox(
-                height: 80, child: Center(child: CircularProgressIndicator())),
+              height: 80,
+              child: Center(child: CircularProgressIndicator()),
+            ),
             error: (_, __) => const SizedBox.shrink(),
             data: (stats) => Container(
               margin: const EdgeInsets.all(16),
@@ -136,8 +136,10 @@ class _HistoryTab extends ConsumerWidget {
               data: (dividends) {
                 if (dividends.isEmpty) {
                   return const Center(
-                    child: Text('배당금 내역이 없습니다',
-                        style: TextStyle(color: AppColors.textSecondary)),
+                    child: Text(
+                      '배당금 내역이 없습니다',
+                      style: TextStyle(color: AppColors.textSecondary),
+                    ),
                   );
                 }
 
@@ -147,7 +149,8 @@ class _HistoryTab extends ConsumerWidget {
                     builder: (dialogContext) => AlertDialog(
                       title: const Text('배당금 삭제'),
                       content: Text(
-                          '${dividend.ticker ?? '종목'} ${NumberFormat('###,##0.00').format(dividend.amount)} 삭제할까요?'),
+                        '${dividend.ticker ?? '종목'} ${NumberFormat('###,##0.00').format(dividend.amount)} 삭제할까요?',
+                      ),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(dialogContext, false),
@@ -155,7 +158,10 @@ class _HistoryTab extends ConsumerWidget {
                         ),
                         TextButton(
                           onPressed: () => Navigator.pop(dialogContext, true),
-                          child: const Text('삭제', style: TextStyle(color: AppColors.negative)),
+                          child: const Text(
+                            '삭제',
+                            style: TextStyle(color: AppColors.negative),
+                          ),
                         ),
                       ],
                     ),
@@ -163,14 +169,17 @@ class _HistoryTab extends ConsumerWidget {
 
                   if (confirm != true) return;
                   try {
-                    await ref.read(apiServiceProvider).deleteDividend(dividend.id);
+                    await ref
+                        .read(apiServiceProvider)
+                        .deleteDividend(dividend.id);
                     ref.invalidate(dividendStatsProvider);
                     ref.invalidate(allDividendsProvider);
                     ref.invalidate(recentDividendsProvider);
                     ref.invalidate(monthlyDividendsProvider);
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context)
-                          .showSnackBar(const SnackBar(content: Text('삭제되었습니다')));
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(const SnackBar(content: Text('삭제되었습니다')));
                     }
                   } catch (e) {
                     if (context.mounted) {
@@ -187,14 +196,15 @@ class _HistoryTab extends ConsumerWidget {
                 return ListView.separated(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   itemCount: dividends.length,
-                  separatorBuilder: (_, __) =>
-                      const Divider(color: AppColors.cardBorder),
+                  separatorBuilder: (_, __) => const Divider(
+                    color: AppColors.cardBorder,
+                    height: 4,
+                    thickness: 1,
+                  ),
                   itemBuilder: (_, i) => _DividendItem(
                     dividend: dividends[i],
-                    onEdit: () => showAddDividendSheet(
-                      context,
-                      dividend: dividends[i],
-                    ),
+                    onEdit: () =>
+                        showAddDividendSheet(context, dividend: dividends[i]),
                     onDelete: () => deleteDividend(dividends[i]),
                   ),
                 );
@@ -252,8 +262,10 @@ class _AnalysisTab extends ConsumerWidget {
 
         if (dividends.isEmpty) {
           return const Center(
-            child: Text('분석할 배당 데이터가 없습니다',
-                style: TextStyle(color: AppColors.textSecondary)),
+            child: Text(
+              '분석할 배당 데이터가 없습니다',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
           );
         }
 
@@ -261,11 +273,12 @@ class _AnalysisTab extends ConsumerWidget {
         final byAsset = <int, _AssetStat>{};
         for (final d in dividends) {
           final stat = byAsset.putIfAbsent(
-              d.assetId,
-              () => _AssetStat(
-                    name: d.assetName ?? 'Unknown',
-                    ticker: d.ticker ?? '',
-                  ));
+            d.assetId,
+            () => _AssetStat(
+              name: d.assetName ?? 'Unknown',
+              ticker: d.ticker ?? '',
+            ),
+          );
           if (d.currency == 'KRW') {
             stat.krwTotal += d.amount;
           } else {
@@ -275,17 +288,17 @@ class _AnalysisTab extends ConsumerWidget {
         final sortedAssets = byAsset.values.toList()
           ..sort((a, b) => b.totalKrw(rate).compareTo(a.totalKrw(rate)));
         final topAssets = sortedAssets.take(5).toList();
-        final maxAssetKrw =
-            topAssets.isNotEmpty ? topAssets.first.totalKrw(rate) : 1.0;
+        final maxAssetKrw = topAssets.isNotEmpty
+            ? topAssets.first.totalKrw(rate)
+            : 1.0;
 
         // 계좌별 집계
         final byAccount = <int, _AccountStat>{};
         for (final d in dividends) {
           final stat = byAccount.putIfAbsent(
-              d.accountId,
-              () => _AccountStat(
-                    name: d.accountName ?? 'Unknown',
-                  ));
+            d.accountId,
+            () => _AccountStat(name: d.accountName ?? 'Unknown'),
+          );
           if (d.currency == 'KRW') {
             stat.krwTotal += d.amount;
           } else {
@@ -301,8 +314,7 @@ class _AnalysisTab extends ConsumerWidget {
         // 연도별 집계
         final byYear = <String, _YearStat>{};
         for (final d in dividends) {
-          final year =
-              d.date.length >= 4 ? d.date.substring(0, 4) : 'Unknown';
+          final year = d.date.length >= 4 ? d.date.substring(0, 4) : 'Unknown';
           final stat = byYear.putIfAbsent(year, () => _YearStat());
           if (d.currency == 'KRW') {
             stat.krwTotal += d.amount;
@@ -321,7 +333,10 @@ class _AnalysisTab extends ConsumerWidget {
               _AnalysisFilterBar(
                 showKrw: showKrw,
                 onChanged: (value) =>
-                    ref.read(accountDividendCurrencyKrwProvider.notifier).state = value,
+                    ref
+                            .read(accountDividendCurrencyKrwProvider.notifier)
+                            .state =
+                        value,
               ),
               const SizedBox(height: 12),
               // 종목별 TOP 5
@@ -372,13 +387,14 @@ class _AnalysisTab extends ConsumerWidget {
 
               // 연도별
               const _SectionHeader('연도별 배당', Icons.calendar_today_rounded),
-              ...sortedYears
-                  .map((e) => _YearRow(
-                        year: e.key,
-                        stat: e.value,
-                        rate: rate,
-                        showKrw: showKrw,
-                      )),
+              ...sortedYears.map(
+                (e) => _YearRow(
+                  year: e.key,
+                  stat: e.value,
+                  rate: rate,
+                  showKrw: showKrw,
+                ),
+              ),
             ],
           ),
         );
@@ -417,16 +433,15 @@ class _SectionHeader extends StatelessWidget {
         children: [
           Icon(icon, color: AppColors.primary, size: 18),
           const SizedBox(width: 8),
-          Text(title,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-              )),
-          if (trailing != null) ...[
-            const Spacer(),
-            trailing!,
-          ],
+          Text(
+            title,
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          if (trailing != null) ...[const Spacer(), trailing!],
         ],
       ),
     );
@@ -437,10 +452,7 @@ class _AnalysisFilterBar extends StatelessWidget {
   final bool showKrw;
   final ValueChanged<bool> onChanged;
 
-  const _AnalysisFilterBar({
-    required this.showKrw,
-    required this.onChanged,
-  });
+  const _AnalysisFilterBar({required this.showKrw, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
@@ -453,7 +465,11 @@ class _AnalysisFilterBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.tune_rounded, size: 16, color: AppColors.textSecondary),
+          const Icon(
+            Icons.tune_rounded,
+            size: 16,
+            color: AppColors.textSecondary,
+          ),
           const SizedBox(width: 8),
           const Text(
             '통화 표시',
@@ -464,10 +480,7 @@ class _AnalysisFilterBar extends StatelessWidget {
             ),
           ),
           const Spacer(),
-          _CurrencyToggle(
-            showKrw: showKrw,
-            onChanged: onChanged,
-          ),
+          _CurrencyToggle(showKrw: showKrw, onChanged: onChanged),
         ],
       ),
     );
@@ -478,10 +491,7 @@ class _CurrencyToggle extends StatelessWidget {
   final bool showKrw;
   final ValueChanged<bool> onChanged;
 
-  const _CurrencyToggle({
-    required this.showKrw,
-    required this.onChanged,
-  });
+  const _CurrencyToggle({required this.showKrw, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
@@ -613,9 +623,10 @@ class _StatBarRow extends StatelessWidget {
                 child: Text(
                   title,
                   style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600),
+                    color: AppColors.textPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -623,9 +634,10 @@ class _StatBarRow extends StatelessWidget {
               Text(
                 subtitle,
                 style: const TextStyle(
-                    color: AppColors.primary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700),
+                  color: AppColors.primary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ],
           ),
@@ -678,11 +690,14 @@ class _YearRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Text('$year년',
-              style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700)),
+          Text(
+            '$year년',
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
           const Spacer(),
           Text(
             _fmtUnifiedAmount(),
@@ -704,23 +719,29 @@ class _SummaryItem extends StatelessWidget {
   final String label;
   final String value;
   final Color color;
-  const _SummaryItem(
-      {required this.label, required this.value, this.color = AppColors.primary});
+  const _SummaryItem({
+    required this.label,
+    required this.value,
+    this.color = AppColors.primary,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(label,
-            style: const TextStyle(
-                color: AppColors.textSecondary, fontSize: 11)),
+        Text(
+          label,
+          style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
+        ),
         const SizedBox(height: 6),
-        Text(value,
-            style: TextStyle(
-              color: color,
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
-            )),
+        Text(
+          value,
+          style: TextStyle(
+            color: color,
+            fontSize: 15,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
       ],
     );
   }
@@ -740,83 +761,127 @@ class _DividendItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final name = dividend.assetName ?? 'Unknown';
     final ticker = dividend.ticker ?? '';
+    final fallbackTicker = ticker.trim().toUpperCase();
+    final logoUrl =
+        (dividend.logoUrl != null && dividend.logoUrl!.trim().isNotEmpty)
+        ? dividend.logoUrl!.trim()
+        : (fallbackTicker.isNotEmpty
+              ? 'https://financialmodelingprep.com/image-stock/${Uri.encodeComponent(fallbackTicker)}.png'
+              : null);
     String date = dividend.date;
     try {
       date = DateFormat('MMM dd, yyyy').format(DateTime.parse(dividend.date));
     } catch (_) {}
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: AppColors.primaryDim,
-              borderRadius: BorderRadius.circular(13),
-            ),
-            child: const Icon(Icons.account_balance_rounded,
-                color: AppColors.primary, size: 20),
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: SizedBox(
+        height: 88,
+        child: Slidable(
+          key: ValueKey('dividend-${dividend.id}'),
+          endActionPane: ActionPane(
+            motion: const DrawerMotion(),
+            extentRatio: 0.45,
+            children: [
+              SlidableAction(
+                onPressed: (_) => onEdit(),
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.background,
+                icon: Icons.edit_outlined,
+                label: '수정',
+              ),
+              SlidableAction(
+                onPressed: (_) => onDelete(),
+                backgroundColor: AppColors.negative,
+                foregroundColor: Colors.white,
+                icon: Icons.delete_outline,
+                label: '삭제',
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  ticker.isNotEmpty ? '$name ($ticker)' : name,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                  ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppColors.primaryDim,
+                  borderRadius: BorderRadius.circular(13),
                 ),
-                Text(date,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(13),
+                  child: logoUrl == null
+                      ? const Icon(
+                          Icons.account_balance_rounded,
+                          color: AppColors.primary,
+                          size: 20,
+                        )
+                      : Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: Image.network(
+                            logoUrl,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) => const Icon(
+                              Icons.account_balance_rounded,
+                              color: AppColors.primary,
+                              size: 20,
+                            ),
+                          ),
+                        ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      ticker.isNotEmpty ? '$name ($ticker)' : name,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      date,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    dividend.currency == 'KRW'
+                        ? '+₩${NumberFormat('#,###').format(dividend.amount)}'
+                        : '+\$${NumberFormat('#,##0.00').format(dividend.amount)}',
                     style: const TextStyle(
-                        fontSize: 12, color: AppColors.textSecondary)),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                dividend.currency == 'KRW'
-                    ? '+₩${NumberFormat('#,###').format(dividend.amount)}'
-                    : '+\$${NumberFormat('#,##0.00').format(dividend.amount)}',
-                style: const TextStyle(
-                  color: AppColors.positive,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14,
-                ),
-              ),
-              Text(
-                dividend.currency == 'KRW'
-                    ? '-₩${NumberFormat('#,###').format(dividend.tax)} 세금'
-                    : '-\$${NumberFormat('#,##0.00').format(dividend.tax)} 세금',
-                style: const TextStyle(
-                    fontSize: 11, color: AppColors.textSecondary),
+                      color: AppColors.positive,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
+                  ),
+                  Text(
+                    dividend.currency == 'KRW'
+                        ? '-₩${NumberFormat('#,###').format(dividend.tax)} 세금'
+                        : '-\$${NumberFormat('#,##0.00').format(dividend.tax)} 세금',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-          Column(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.edit_outlined,
-                    color: AppColors.primary, size: 18),
-                onPressed: onEdit,
-                tooltip: '수정',
-              ),
-              IconButton(
-                icon: const Icon(Icons.delete_outline,
-                    color: AppColors.negative, size: 18),
-                onPressed: onDelete,
-                tooltip: '삭제',
-              ),
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }

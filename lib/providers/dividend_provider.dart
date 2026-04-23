@@ -51,14 +51,16 @@ final dividendStatsProvider = FutureProvider<DividendStats>((ref) async {
   return ref.watch(apiServiceProvider).getDividendStats();
 });
 
-final monthlyDividendsProvider = FutureProvider<List<MonthlyDividend>>((ref) async {
+final monthlyDividendsProvider = FutureProvider<List<MonthlyDividend>>((
+  ref,
+) async {
   final now = DateTime.now();
   final startDate = '${now.year - 1}-01-01';
-  final endDate = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-  return ref.watch(apiServiceProvider).getMonthlyDividends(
-        startDate: startDate,
-        endDate: endDate,
-      );
+  final endDate =
+      '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+  return ref
+      .watch(apiServiceProvider)
+      .getMonthlyDividends(startDate: startDate, endDate: endDate);
 });
 
 // 전체 배당금 (계좌/자산 정보 enriched)
@@ -87,21 +89,24 @@ final allDividendsProvider = FutureProvider<List<Dividend>>((ref) async {
     for (final d in dividends) {
       final asset = assetMap[d.assetId];
       final acc = accountMap[d.accountId];
-      allDividends.add(Dividend(
-        id: d.id,
-        accountId: d.accountId,
-        assetId: d.assetId,
-        date: d.date,
-        amount: d.amount,
-        tax: d.tax,
-        currency: d.currency,
-        isReceived: d.isReceived,
-        notes: d.notes,
-        assetName: d.assetName ?? asset?.name,
-        ticker: d.ticker ?? asset?.ticker,
-        accountName: acc?.name,
-        accountBroker: acc?.broker,
-      ));
+      allDividends.add(
+        Dividend(
+          id: d.id,
+          accountId: d.accountId,
+          assetId: d.assetId,
+          date: d.date,
+          amount: d.amount,
+          tax: d.tax,
+          currency: d.currency,
+          isReceived: d.isReceived,
+          notes: d.notes,
+          assetName: d.assetName ?? asset?.name,
+          ticker: d.ticker ?? asset?.ticker,
+          logoUrl: d.logoUrl ?? asset?.logoUrl,
+          accountName: acc?.name,
+          accountBroker: acc?.broker,
+        ),
+      );
     }
   }
   allDividends.sort((a, b) => b.date.compareTo(a.date));

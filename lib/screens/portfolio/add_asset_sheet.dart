@@ -69,7 +69,13 @@ class _AddAssetSheetState extends ConsumerState<_AddAssetSheet> {
     final ticker = _tickerCtrl.text.trim().toUpperCase();
     final qty = double.tryParse(_qtyCtrl.text);
     final price = double.tryParse(_priceCtrl.text);
-    if (ticker.isEmpty || qty == null || qty <= 0 || price == null || price <= 0 || _selectedAccount == null) return;
+    if (ticker.isEmpty ||
+        qty == null ||
+        qty <= 0 ||
+        price == null ||
+        price <= 0 ||
+        _selectedAccount == null)
+      return;
 
     // await 전에 필요한 값 미리 캡처
     final accountId = _selectedAccount!.id;
@@ -81,7 +87,9 @@ class _AddAssetSheetState extends ConsumerState<_AddAssetSheet> {
       final assets = ref.read(assetsProvider).valueOrNull ?? [];
 
       // 기존 자산 확인
-      final existing = assets.where((a) => a.ticker.toUpperCase() == ticker).firstOrNull;
+      final existing = assets
+          .where((a) => a.ticker.toUpperCase() == ticker)
+          .firstOrNull;
       final int assetId;
       if (existing != null) {
         assetId = existing.id;
@@ -90,11 +98,13 @@ class _AddAssetSheetState extends ConsumerState<_AddAssetSheet> {
         final name = _tickerInfo?['name'] ?? ticker;
         final type = _tickerInfo?['type'] ?? 'Stock';
         final sector = _tickerInfo?['sector'];
+        final logoUrl = _tickerInfo?['logo_url'] ?? _tickerInfo?['logoUrl'];
         final newAsset = await api.createAsset({
           'ticker': ticker,
           'name': name,
           'type': type,
           if (sector != null) 'sector': sector,
+          if (logoUrl != null) 'logo_url': logoUrl,
         });
         assetId = newAsset.id;
       }
@@ -237,8 +247,10 @@ class _AddAssetSheetState extends ConsumerState<_AddAssetSheet> {
                               color: AppColors.background,
                             ),
                           )
-                        : const Text('조회',
-                            style: TextStyle(fontWeight: FontWeight.w700)),
+                        : const Text(
+                            '조회',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
                   ),
                 ),
               ],
@@ -247,9 +259,10 @@ class _AddAssetSheetState extends ConsumerState<_AddAssetSheet> {
             // 조회 결과
             if (_lookupError != null) ...[
               const SizedBox(height: 8),
-              Text(_lookupError!,
-                  style: const TextStyle(
-                      color: AppColors.negative, fontSize: 12)),
+              Text(
+                _lookupError!,
+                style: const TextStyle(color: AppColors.negative, fontSize: 12),
+              ),
             ],
             if (_tickerInfo != null) ...[
               const SizedBox(height: 10),
@@ -268,8 +281,11 @@ class _AddAssetSheetState extends ConsumerState<_AddAssetSheet> {
                         color: AppColors.primaryDim,
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(Icons.check_circle_outline_rounded,
-                          color: AppColors.primary, size: 18),
+                      child: const Icon(
+                        Icons.check_circle_outline_rounded,
+                        color: AppColors.primary,
+                        size: 18,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -319,17 +335,25 @@ class _AddAssetSheetState extends ConsumerState<_AddAssetSheet> {
                     value: _selectedAccount,
                     isExpanded: true,
                     dropdownColor: AppColors.surfaceHigh,
-                    hint: const Text('계좌 선택',
-                        style: TextStyle(color: AppColors.textSecondary)),
+                    hint: const Text(
+                      '계좌 선택',
+                      style: TextStyle(color: AppColors.textSecondary),
+                    ),
                     style: const TextStyle(
-                        color: AppColors.textPrimary, fontSize: 14),
-                    icon: const Icon(Icons.keyboard_arrow_down_rounded,
-                        color: AppColors.textSecondary),
+                      color: AppColors.textPrimary,
+                      fontSize: 14,
+                    ),
+                    icon: const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: AppColors.textSecondary,
+                    ),
                     items: accounts
-                        .map((a) => DropdownMenuItem(
-                              value: a,
-                              child: Text('${a.broker} · ${a.name}'),
-                            ))
+                        .map(
+                          (a) => DropdownMenuItem(
+                            value: a,
+                            child: Text('${a.broker} · ${a.name}'),
+                          ),
+                        )
                         .toList(),
                     onChanged: (a) => setState(() => _selectedAccount = a),
                   ),
@@ -350,8 +374,12 @@ class _AddAssetSheetState extends ConsumerState<_AddAssetSheet> {
                       _DarkTextField(
                         controller: _qtyCtrl,
                         hint: '0',
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(RegExp(r'[\d.]')),
+                        ],
                         onChanged: (_) => setState(() {}),
                       ),
                     ],
@@ -367,8 +395,12 @@ class _AddAssetSheetState extends ConsumerState<_AddAssetSheet> {
                       _DarkTextField(
                         controller: _priceCtrl,
                         hint: '0.00',
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(RegExp(r'[\d.]')),
+                        ],
                         onChanged: (_) => setState(() {}),
                       ),
                     ],
@@ -384,7 +416,10 @@ class _AddAssetSheetState extends ConsumerState<_AddAssetSheet> {
             GestureDetector(
               onTap: _pickDate,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 16,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.surfaceHigh,
                   borderRadius: BorderRadius.circular(14),
@@ -392,8 +427,11 @@ class _AddAssetSheetState extends ConsumerState<_AddAssetSheet> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.calendar_today_rounded,
-                        color: AppColors.textSecondary, size: 18),
+                    const Icon(
+                      Icons.calendar_today_rounded,
+                      color: AppColors.textSecondary,
+                      size: 18,
+                    ),
                     const SizedBox(width: 10),
                     Text(
                       DateFormat('yyyy년 MM월 dd일').format(_date),
@@ -499,7 +537,10 @@ class _DarkTextField extends StatelessWidget {
         hintStyle: const TextStyle(color: AppColors.textSecondary),
         filled: true,
         fillColor: AppColors.surfaceHigh,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 16,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: AppColors.border),
