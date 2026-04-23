@@ -22,6 +22,66 @@ class ApiService {
           'Authorization': 'Bearer ${ApiConstants.apiKey}',
       },
     ));
+
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          // Fail early with a clear message when API_KEY is not injected.
+          if (ApiConstants.apiKey.isEmpty) {
+            return handler.reject(
+              DioException(
+                requestOptions: options,
+                type: DioExceptionType.badResponse,
+                response: Response(
+                  requestOptions: options,
+                  statusCode: 401,
+                  statusMessage: 'API_KEY_MISSING',
+                ),
+                message:
+                    'API_KEY가 설정되지 않았습니다. flutter run --dart-define-from-file=.env.json 으로 실행하세요.',
+                error:
+                    'API_KEY가 설정되지 않았습니다. flutter run --dart-define-from-file=.env.json 으로 실행하세요.',
+              ),
+            );
+          }
+          handler.next(options);
+        },
+        onError: (error, handler) {
+          final userMessage = _toUserMessage(error);
+          handler.reject(
+            error.copyWith(
+              message: userMessage,
+              error: userMessage,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  String _toUserMessage(DioException e) {
+    if (ApiConstants.apiKey.isEmpty) {
+      return 'API_KEY가 설정되지 않았습니다. .env.json을 만든 뒤 --dart-define-from-file=.env.json 옵션으로 실행하세요.';
+    }
+
+    final statusCode = e.response?.statusCode;
+    if (statusCode == 401) {
+      return '인증 실패(401): API_KEY가 없거나 올바르지 않습니다.';
+    }
+    if (statusCode != null) {
+      return '서버 요청 실패($statusCode): 잠시 후 다시 시도해 주세요.';
+    }
+
+    switch (e.type) {
+      case DioExceptionType.connectionTimeout:
+      case DioExceptionType.sendTimeout:
+      case DioExceptionType.receiveTimeout:
+        return '요청 시간이 초과되었습니다. 네트워크 상태를 확인해 주세요.';
+      case DioExceptionType.connectionError:
+        return '네트워크 연결 오류가 발생했습니다.';
+      default:
+        return '서버 연결 중 오류가 발생했습니다.';
+    }
   }
 
   // Accounts
@@ -106,6 +166,11 @@ class ApiService {
 
   Future<Dividend> createDividend(Map<String, dynamic> data) async {
     final res = await _dio.post('/dividends', data: data);
+    return Dividend.fromJson(res.data);
+  }
+
+  Future<Dividend> updateDividend(int id, Map<String, dynamic> data) async {
+    final res = await _dio.put('/dividends/$id', data: data);
     return Dividend.fromJson(res.data);
   }
 

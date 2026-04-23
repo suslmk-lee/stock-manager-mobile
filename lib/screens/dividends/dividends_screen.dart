@@ -4,7 +4,11 @@ import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/dividend.dart';
 import '../../providers/dividend_provider.dart';
+import '../../services/api_service.dart';
 import 'add_dividend_sheet.dart';
+
+// true: KRW, false: USD (기본 KRW)
+final accountDividendCurrencyKrwProvider = StateProvider<bool>((ref) => true);
 
 class DividendsScreen extends ConsumerStatefulWidget {
   const DividendsScreen({super.key});
@@ -83,6 +87,8 @@ class _HistoryTab extends ConsumerWidget {
       onRefresh: () async {
         ref.invalidate(dividendStatsProvider);
         ref.invalidate(allDividendsProvider);
+        ref.invalidate(recentDividendsProvider);
+        ref.invalidate(monthlyDividendsProvider);
       },
       child: Column(
         children: [
@@ -134,13 +140,63 @@ class _HistoryTab extends ConsumerWidget {
                         style: TextStyle(color: AppColors.textSecondary)),
                   );
                 }
+
+                Future<void> deleteDividend(Dividend dividend) async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (dialogContext) => AlertDialog(
+                      title: const Text('배당금 삭제'),
+                      content: Text(
+                          '${dividend.ticker ?? '종목'} ${NumberFormat('###,##0.00').format(dividend.amount)} 삭제할까요?'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(dialogContext, false),
+                          child: const Text('취소'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(dialogContext, true),
+                          child: const Text('삭제', style: TextStyle(color: AppColors.negative)),
+                        ),
+                      ],
+                    ),
+                  );
+
+                  if (confirm != true) return;
+                  try {
+                    await ref.read(apiServiceProvider).deleteDividend(dividend.id);
+                    ref.invalidate(dividendStatsProvider);
+                    ref.invalidate(allDividendsProvider);
+                    ref.invalidate(recentDividendsProvider);
+                    ref.invalidate(monthlyDividendsProvider);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context)
+                          .showSnackBar(const SnackBar(content: Text('삭제되었습니다')));
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('삭제 실패: $e'),
+                          backgroundColor: AppColors.negative,
+                        ),
+                      );
+                    }
+                  }
+                }
+
                 return ListView.separated(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   itemCount: dividends.length,
                   separatorBuilder: (_, __) =>
                       const Divider(color: AppColors.cardBorder),
-                  itemBuilder: (_, i) =>
-                      _DividendItem(dividend: dividends[i]),
+                  itemBuilder: (_, i) => _DividendItem(
+                    dividend: dividends[i],
+                    onEdit: () => showAddDividendSheet(
+                      context,
+                      dividend: dividends[i],
+                    ),
+                    onDelete: () => deleteDividend(dividends[i]),
+                  ),
                 );
               },
             ),
@@ -186,6 +242,7 @@ class _AnalysisTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final allAsync = ref.watch(allDividendsProvider);
     final rateAsync = ref.watch(exchangeRateProvider);
+    final showKrw = ref.watch(accountDividendCurrencyKrwProvider);
 
     return allAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -261,6 +318,12 @@ class _AnalysisTab extends ConsumerWidget {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
             children: [
+              _AnalysisFilterBar(
+                showKrw: showKrw,
+                onChanged: (value) =>
+                    ref.read(accountDividendCurrencyKrwProvider.notifier).state = value,
+              ),
+              const SizedBox(height: 12),
               // 종목별 TOP 5
               const _SectionHeader('종목별 배당 TOP 5', Icons.bar_chart_rounded),
               _StatCard(
@@ -269,8 +332,12 @@ class _AnalysisTab extends ConsumerWidget {
                     _StatBarRow(
                       rank: i + 1,
                       title: topAssets[i].displayName,
-                      subtitle: _fmtAmount(
-                          topAssets[i].usdTotal, topAssets[i].krwTotal),
+                      subtitle: _fmtUnifiedAmount(
+                        usd: topAssets[i].usdTotal,
+                        krw: topAssets[i].krwTotal,
+                        rate: rate,
+                        showKrw: showKrw,
+                      ),
                       progress: maxAssetKrw > 0
                           ? topAssets[i].totalKrw(rate) / maxAssetKrw
                           : 0,
@@ -288,9 +355,12 @@ class _AnalysisTab extends ConsumerWidget {
                     _StatBarRow(
                       rank: i + 1,
                       title: sortedAccounts[i].name,
-                      subtitle: _fmtAmount(
-                          sortedAccounts[i].usdTotal,
-                          sortedAccounts[i].krwTotal),
+                      subtitle: _fmtUnifiedAmount(
+                        usd: sortedAccounts[i].usdTotal,
+                        krw: sortedAccounts[i].krwTotal,
+                        rate: rate,
+                        showKrw: showKrw,
+                      ),
                       progress: maxAccountKrw > 0
                           ? sortedAccounts[i].totalKrw(rate) / maxAccountKrw
                           : 0,
@@ -303,7 +373,12 @@ class _AnalysisTab extends ConsumerWidget {
               // 연도별
               const _SectionHeader('연도별 배당', Icons.calendar_today_rounded),
               ...sortedYears
-                  .map((e) => _YearRow(year: e.key, stat: e.value)),
+                  .map((e) => _YearRow(
+                        year: e.key,
+                        stat: e.value,
+                        rate: rate,
+                        showKrw: showKrw,
+                      )),
             ],
           ),
         );
@@ -311,11 +386,18 @@ class _AnalysisTab extends ConsumerWidget {
     );
   }
 
-  static String _fmtAmount(double usd, double krw) {
-    final parts = <String>[];
-    if (usd > 0) parts.add('\$${NumberFormat('#,##0.00').format(usd)}');
-    if (krw > 0) parts.add('₩${NumberFormat('#,###').format(krw.round())}');
-    return parts.join('  ');
+  static String _fmtUnifiedAmount({
+    required double usd,
+    required double krw,
+    required double rate,
+    required bool showKrw,
+  }) {
+    if (showKrw) {
+      final totalKrw = krw + (usd * rate);
+      return '₩${NumberFormat('#,###').format(totalKrw.round())}';
+    }
+    final totalUsd = usd + (rate > 0 ? krw / rate : 0);
+    return '\$${NumberFormat('#,##0.00').format(totalUsd)}';
   }
 }
 
@@ -324,7 +406,8 @@ class _AnalysisTab extends ConsumerWidget {
 class _SectionHeader extends StatelessWidget {
   final String title;
   final IconData icon;
-  const _SectionHeader(this.title, this.icon);
+  final Widget? trailing;
+  const _SectionHeader(this.title, this.icon, {this.trailing});
 
   @override
   Widget build(BuildContext context) {
@@ -340,7 +423,125 @@ class _SectionHeader extends StatelessWidget {
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
               )),
+          if (trailing != null) ...[
+            const Spacer(),
+            trailing!,
+          ],
         ],
+      ),
+    );
+  }
+}
+
+class _AnalysisFilterBar extends StatelessWidget {
+  final bool showKrw;
+  final ValueChanged<bool> onChanged;
+
+  const _AnalysisFilterBar({
+    required this.showKrw,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.tune_rounded, size: 16, color: AppColors.textSecondary),
+          const SizedBox(width: 8),
+          const Text(
+            '통화 표시',
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const Spacer(),
+          _CurrencyToggle(
+            showKrw: showKrw,
+            onChanged: onChanged,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CurrencyToggle extends StatelessWidget {
+  final bool showKrw;
+  final ValueChanged<bool> onChanged;
+
+  const _CurrencyToggle({
+    required this.showKrw,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surfaceHigh,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _CurrencyChip(
+            label: 'KRW',
+            selected: showKrw,
+            onTap: () => onChanged(true),
+          ),
+          _CurrencyChip(
+            label: 'USD',
+            selected: !showKrw,
+            onTap: () => onChanged(false),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CurrencyChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _CurrencyChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primaryDim : Colors.transparent,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: selected ? AppColors.primary : Colors.transparent,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: selected ? AppColors.primary : AppColors.textSecondary,
+          ),
+        ),
       ),
     );
   }
@@ -447,7 +648,23 @@ class _StatBarRow extends StatelessWidget {
 class _YearRow extends StatelessWidget {
   final String year;
   final _YearStat stat;
-  const _YearRow({required this.year, required this.stat});
+  final double rate;
+  final bool showKrw;
+  const _YearRow({
+    required this.year,
+    required this.stat,
+    required this.rate,
+    required this.showKrw,
+  });
+
+  String _fmtUnifiedAmount() {
+    if (showKrw) {
+      final totalKrw = stat.krwTotal + (stat.usdTotal * rate);
+      return '₩${NumberFormat('#,###').format(totalKrw.round())}';
+    }
+    final totalUsd = stat.usdTotal + (rate > 0 ? stat.krwTotal / rate : 0);
+    return '\$${NumberFormat('#,##0.00').format(totalUsd)}';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -467,24 +684,14 @@ class _YearRow extends StatelessWidget {
                   fontSize: 14,
                   fontWeight: FontWeight.w700)),
           const Spacer(),
-          if (stat.usdTotal > 0)
-            Text(
-              '\$${NumberFormat('#,##0.00').format(stat.usdTotal)}',
-              style: const TextStyle(
-                  color: AppColors.primary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700),
+          Text(
+            _fmtUnifiedAmount(),
+            style: const TextStyle(
+              color: AppColors.primary,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
             ),
-          if (stat.usdTotal > 0 && stat.krwTotal > 0)
-            const SizedBox(width: 12),
-          if (stat.krwTotal > 0)
-            Text(
-              '₩${NumberFormat('#,###').format(stat.krwTotal.round())}',
-              style: const TextStyle(
-                  color: AppColors.positive,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700),
-            ),
+          ),
         ],
       ),
     );
@@ -521,7 +728,13 @@ class _SummaryItem extends StatelessWidget {
 
 class _DividendItem extends StatelessWidget {
   final Dividend dividend;
-  const _DividendItem({required this.dividend});
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+  const _DividendItem({
+    required this.dividend,
+    required this.onEdit,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -584,6 +797,22 @@ class _DividendItem extends StatelessWidget {
                     : '-\$${NumberFormat('#,##0.00').format(dividend.tax)} 세금',
                 style: const TextStyle(
                     fontSize: 11, color: AppColors.textSecondary),
+              ),
+            ],
+          ),
+          Column(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.edit_outlined,
+                    color: AppColors.primary, size: 18),
+                onPressed: onEdit,
+                tooltip: '수정',
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline,
+                    color: AppColors.negative, size: 18),
+                onPressed: onDelete,
+                tooltip: '삭제',
               ),
             ],
           ),

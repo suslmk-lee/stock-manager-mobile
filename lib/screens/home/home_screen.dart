@@ -349,10 +349,21 @@ class _TotalDividendCard extends ConsumerWidget {
                     color: AppColors.primaryDim,
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: Icon(
-                    _showKrw ? Icons.paid_outlined : Icons.attach_money_rounded,
-                    color: AppColors.primary,
-                    size: 28,
+                  child: Center(
+                    child: _showKrw
+                        ? const Text(
+                            '₩',
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontSize: 30,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          )
+                        : const Icon(
+                            Icons.attach_money_rounded,
+                            color: AppColors.primary,
+                            size: 28,
+                          ),
                   ),
                 ),
               ],
@@ -819,8 +830,23 @@ class _ErrorCard extends StatelessWidget {
   final String message;
   const _ErrorCard({required this.message});
 
+  String _toDisplayMessage(String raw) {
+    final lower = raw.toLowerCase();
+    if (lower.contains('api_key') || lower.contains('401')) {
+      return '인증 실패(401)\nAPI_KEY를 확인하고 --dart-define-from-file=.env.json 옵션으로 다시 실행해 주세요.';
+    }
+    if (lower.contains('timeout')) {
+      return '요청 시간이 초과되었습니다. 네트워크 상태를 확인해 주세요.';
+    }
+    if (lower.contains('socketexception') || lower.contains('connection')) {
+      return '네트워크 연결 오류가 발생했습니다.';
+    }
+    return raw.length > 180 ? '${raw.substring(0, 180)}...' : raw;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final display = _toDisplayMessage(message);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -828,7 +854,7 @@ class _ErrorCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.negative.withValues(alpha: 0.3)),
       ),
-      child: Text('서버 연결 실패\n$message',
+      child: Text('서버 연결 실패\n$display',
           style: const TextStyle(color: AppColors.negative, fontSize: 12)),
     );
   }

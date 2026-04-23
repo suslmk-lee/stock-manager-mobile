@@ -5,22 +5,25 @@ import 'package:intl/intl.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/account.dart';
 import '../../models/asset.dart';
+import '../../models/dividend.dart';
 import '../../providers/account_provider.dart';
 import '../../providers/asset_provider.dart';
 import '../../providers/dividend_provider.dart';
 import '../../services/api_service.dart';
 
-void showAddDividendSheet(BuildContext context) {
+void showAddDividendSheet(BuildContext context, {Dividend? dividend}) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => const _AddDividendSheet(),
+    builder: (_) => _AddDividendSheet(dividend: dividend),
   );
 }
 
 class _AddDividendSheet extends ConsumerStatefulWidget {
-  const _AddDividendSheet();
+  const _AddDividendSheet({this.dividend});
+
+  final Dividend? dividend;
 
   @override
   ConsumerState<_AddDividendSheet> createState() => _AddDividendSheetState();
@@ -37,6 +40,20 @@ class _AddDividendSheetState extends ConsumerState<_AddDividendSheet> {
   DateTime _date = DateTime.now();
   bool _submitting = false;
 
+  bool get _isEditing => widget.dividend != null;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.dividend != null) {
+      final dividend = widget.dividend!;
+      _amountCtrl.text = dividend.amount.toString();
+      _taxCtrl.text = dividend.tax.toString();
+      _date = DateTime.tryParse(dividend.date) ?? DateTime.now();
+      _currency = dividend.currency;
+    }
+  }
+
   @override
   void dispose() {
     _amountCtrl.dispose();
@@ -45,12 +62,32 @@ class _AddDividendSheetState extends ConsumerState<_AddDividendSheet> {
     super.dispose();
   }
 
+  Account? _resolveAccount(List<Account> accounts) {
+    if (_selectedAccount != null) return _selectedAccount;
+    final id = widget.dividend?.accountId;
+    if (id == null) return null;
+    for (final account in accounts) {
+      if (account.id == id) return account;
+    }
+    return null;
+  }
+
+  Asset? _resolveAsset(List<Asset> assets) {
+    if (_selectedAsset != null) return _selectedAsset;
+    final id = widget.dividend?.assetId;
+    if (id == null) return null;
+    for (final asset in assets) {
+      if (asset.id == id) return asset;
+    }
+    return null;
+  }
+
   /// 선택된 계좌 기준 + 검색어 필터
-  List<Asset> _filteredAssets(List<Asset> all) {
+  List<Asset> _filteredAssets(List<Asset> all, Account? account) {
     final query = _assetSearchCtrl.text.trim().toLowerCase();
-    var list = _selectedAccount == null
+    var list = account == null
         ? all
-        : all.where((a) => a.holdings.any((h) => h.accountId == _selectedAccount!.id)).toList();
+        : all.where((a) => a.holdings.any((h) => h.accountId == account.id)).toList();
     if (query.isNotEmpty) {
       list = list
           .where((a) =>
@@ -65,7 +102,8 @@ class _AddDividendSheetState extends ConsumerState<_AddDividendSheet> {
     setState(() {
       _selectedAsset = asset;
       _assetSearchCtrl.text = '';
-      final isKorean = asset.ticker.endsWith('.KS') || asset.ticker.endsWith('.KQ');
+      final isKorean =
+          asset.ticker.endsWith('.KS') || asset.ticker.endsWith('.KQ');
       _currency = isKorean ? 'KRW' : 'USD';
     });
     FocusScope.of(context).unfocus();
@@ -91,33 +129,42 @@ class _AddDividendSheetState extends ConsumerState<_AddDividendSheet> {
     if (picked != null) setState(() => _date = picked);
   }
 
-  Future<void> _submit() async {
+  Future<void> _submit(Account? account, Asset? asset) async {
     final amount = double.tryParse(_amountCtrl.text);
     final tax = double.tryParse(_taxCtrl.text) ?? 0;
-    if (amount == null || amount <= 0 || _selectedAccount == null || _selectedAsset == null) return;
+
+    if (amount == null || amount <= 0 || account == null || asset == null) return;
 
     setState(() => _submitting = true);
     try {
-      await ref.read(apiServiceProvider).createDividend({
-        'account_id': _selectedAccount!.id,
-        'asset_id': _selectedAsset!.id,
+      final payload = {
+        'account_id': account.id,
+        'asset_id': asset.id,
         'date': DateFormat('yyyy-MM-dd').format(_date),
         'amount': amount,
         'tax': tax,
         'currency': _currency,
         'is_received': true,
-      });
+      };
+
+      final api = ref.read(apiServiceProvider);
+      if (_isEditing) {
+        await api.updateDividend(widget.dividend!.id, payload);
+      } else {
+        await api.createDividend(payload);
+      }
 
       ref.invalidate(dividendStatsProvider);
       ref.invalidate(recentDividendsProvider);
       ref.invalidate(monthlyDividendsProvider);
+      ref.invalidate(allDividendsProvider);
 
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('저장 실패: $e'),
+            content: Text(_isEditing ? '수정 실패: $e' : '저장 실패: $e'),
             backgroundColor: AppColors.negative,
           ),
         );
@@ -127,17 +174,17 @@ class _AddDividendSheetState extends ConsumerState<_AddDividendSheet> {
     }
   }
 
-  bool get _canSubmit =>
-      _selectedAccount != null &&
-      _selectedAsset != null &&
-      _amountCtrl.text.isNotEmpty &&
-      !_submitting;
+  bool _canSubmit(Account? account, Asset? asset) =>
+      account != null && asset != null && _amountCtrl.text.isNotEmpty && !_submitting;
 
   @override
   Widget build(BuildContext context) {
     final accountsAsync = ref.watch(accountsProvider);
     final assetsAsync = ref.watch(assetsProvider);
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
+    Account? currentAccount;
+    Asset? currentAsset;
 
     return DraggableScrollableSheet(
       initialChildSize: 0.85,
@@ -163,9 +210,9 @@ class _AddDividendSheetState extends ConsumerState<_AddDividendSheet> {
                 ),
               ),
             ),
-            const Text(
-              '배당금 추가',
-              style: TextStyle(
+            Text(
+              _isEditing ? '배당금 수정' : '배당금 추가',
+              style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w800,
                 color: AppColors.textPrimary,
@@ -179,17 +226,20 @@ class _AddDividendSheetState extends ConsumerState<_AddDividendSheet> {
             accountsAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (_, __) => const SizedBox.shrink(),
-              data: (accounts) => _DarkDropdown<Account>(
-                value: _selectedAccount,
-                hint: '계좌 선택',
-                items: accounts,
-                itemLabel: (a) => '${a.broker} · ${a.name}',
-                onChanged: (a) => setState(() {
-                  _selectedAccount = a;
-                  _selectedAsset = null;
-                  _assetSearchCtrl.clear();
-                }),
-              ),
+              data: (accounts) {
+                currentAccount = _resolveAccount(accounts);
+                return _DarkDropdown<Account>(
+                  value: currentAccount,
+                  hint: '계좌 선택',
+                  items: accounts,
+                  itemLabel: (a) => '${a.broker} · ${a.name}',
+                  onChanged: (a) => setState(() {
+                    _selectedAccount = a;
+                    _selectedAsset = null;
+                    _assetSearchCtrl.clear();
+                  }),
+                );
+              },
             ),
             const SizedBox(height: 20),
 
@@ -200,13 +250,14 @@ class _AddDividendSheetState extends ConsumerState<_AddDividendSheet> {
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (_, __) => const SizedBox.shrink(),
               data: (allAssets) {
-                // 선택된 종목 표시
-                if (_selectedAsset != null && _assetSearchCtrl.text.isEmpty) {
+                currentAsset = _resolveAsset(allAssets);
+
+                if (currentAsset != null && _assetSearchCtrl.text.isEmpty) {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _SelectedAssetChip(
-                        asset: _selectedAsset!,
+                        asset: currentAsset!,
                         onClear: () => setState(() {
                           _selectedAsset = null;
                           _assetSearchCtrl.clear();
@@ -216,23 +267,23 @@ class _AddDividendSheetState extends ConsumerState<_AddDividendSheet> {
                   );
                 }
 
-                final filtered = _filteredAssets(allAssets);
+                final filtered = _filteredAssets(allAssets, currentAccount);
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 검색 입력창
                     TextField(
                       controller: _assetSearchCtrl,
-                      enabled: _selectedAccount != null,
-                      style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+                      enabled: currentAccount != null,
+                      style:
+                          const TextStyle(color: AppColors.textPrimary, fontSize: 14),
                       onChanged: (_) => setState(() {}),
                       decoration: InputDecoration(
-                        hintText: _selectedAccount == null
+                        hintText: currentAccount == null
                             ? '계좌를 먼저 선택하세요'
                             : '티커 또는 종목명 검색...',
                         hintStyle: const TextStyle(color: AppColors.textSecondary),
-                        prefixIcon: const Icon(Icons.search_rounded,
-                            color: AppColors.textSecondary, size: 20),
+                        prefixIcon:
+                            const Icon(Icons.search_rounded, color: AppColors.textSecondary, size: 20),
                         suffixIcon: _assetSearchCtrl.text.isNotEmpty
                             ? IconButton(
                                 icon: const Icon(Icons.close_rounded,
@@ -242,7 +293,8 @@ class _AddDividendSheetState extends ConsumerState<_AddDividendSheet> {
                             : null,
                         filled: true,
                         fillColor: AppColors.surfaceHigh,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
                           borderSide: const BorderSide(color: AppColors.border),
@@ -253,7 +305,8 @@ class _AddDividendSheetState extends ConsumerState<_AddDividendSheet> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                          borderSide:
+                              const BorderSide(color: AppColors.primary, width: 1.5),
                         ),
                         disabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
@@ -261,7 +314,6 @@ class _AddDividendSheetState extends ConsumerState<_AddDividendSheet> {
                         ),
                       ),
                     ),
-                    // 검색 결과 목록
                     if (_assetSearchCtrl.text.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Container(
@@ -312,7 +364,11 @@ class _AddDividendSheetState extends ConsumerState<_AddDividendSheet> {
                                             child: Center(
                                               child: Text(
                                                 isKorean
-                                                    ? asset.name.substring(0, asset.name.length > 2 ? 2 : asset.name.length)
+                                                    ? asset.name.substring(
+                                                        0,
+                                                        asset.name.length > 2
+                                                            ? 2
+                                                            : asset.name.length)
                                                     : (asset.ticker.length > 4
                                                         ? asset.ticker.substring(0, 4)
                                                         : asset.ticker),
@@ -327,7 +383,8 @@ class _AddDividendSheetState extends ConsumerState<_AddDividendSheet> {
                                           const SizedBox(width: 12),
                                           Expanded(
                                             child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
                                               children: [
                                                 Text(
                                                   isKorean ? asset.name : asset.ticker,
@@ -378,7 +435,8 @@ class _AddDividendSheetState extends ConsumerState<_AddDividendSheet> {
                           onTap: () => setState(() => _currency = c),
                           child: Container(
                             margin: const EdgeInsets.only(right: 8),
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 14),
                             decoration: BoxDecoration(
                               color: selected ? AppColors.primaryDim : AppColors.surfaceHigh,
                               borderRadius: BorderRadius.circular(14),
@@ -460,12 +518,14 @@ class _AddDividendSheetState extends ConsumerState<_AddDividendSheet> {
             ),
             const SizedBox(height: 32),
 
-            // 추가 버튼
+            // 추가/수정 버튼
             SizedBox(
               width: double.infinity,
               height: 56,
               child: FilledButton(
-                onPressed: _canSubmit ? _submit : null,
+                onPressed: _canSubmit(currentAccount, currentAsset)
+                    ? () => _submit(currentAccount, currentAsset)
+                    : null,
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: AppColors.background,
@@ -484,9 +544,10 @@ class _AddDividendSheetState extends ConsumerState<_AddDividendSheet> {
                           color: AppColors.background,
                         ),
                       )
-                    : const Text(
-                        '추가하기',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                    : Text(
+                        _isEditing ? '수정하기' : '추가하기',
+                        style:
+                            const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                       ),
               ),
             ),
@@ -613,7 +674,8 @@ class _DarkDropdown<T> extends StatelessWidget {
           dropdownColor: AppColors.surfaceHigh,
           hint: Text(hint, style: const TextStyle(color: AppColors.textSecondary)),
           style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
-          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textSecondary),
+          icon: const Icon(Icons.keyboard_arrow_down_rounded,
+              color: AppColors.textSecondary),
           items: items
               .map((item) => DropdownMenuItem(
                     value: item,
