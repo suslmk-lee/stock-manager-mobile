@@ -1,211 +1,131 @@
-# Stock Manager
+# Stock Manager Mobile
 
-주식 포트폴리오 및 배당금을 관리하는 Flutter 모바일 앱입니다.
+[![Flutter](https://img.shields.io/badge/Flutter-3.41%2B-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
+[![Dart](https://img.shields.io/badge/Dart-3.11%2B-0175C2?logo=dart&logoColor=white)](https://dart.dev)
+[![Android](https://img.shields.io/badge/Android-APK-3DDC84?logo=android&logoColor=white)](https://developer.android.com)
+[![Release](https://img.shields.io/badge/Release-v1.0.0-111827)](https://github.com/suslmk-lee/stock-manager-mobile/releases/tag/v1.0.0)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-## 주요 기능
+Stock Manager Mobile is a Flutter-based mobile app for tracking stock portfolios, brokerage accounts, and dividend income across KRW and USD.
 
-- **홈**: 총 배당금 (USD + KRW 합산), 이번 달 / 전월 / 월평균 / 최고 달 인사이트, 월별 배당 차트, 최근 배당 내역
-- **포트폴리오**: 계좌별 보유 종목, 현재가 기반 평가금액, KRW/USD 전환, 종목 상세 및 수량 편집
-- **계좌**: 증권사별 계좌 목록
-- **배당**: 배당 내역 및 통계
+It is designed for personal investment tracking with a focus on accurate financial totals, account-based organization, dividend analytics, and a polished mobile experience.
 
-## 기술 스택
+[한국어 문서 보기](README.ko.md)
 
-| 항목 | 내용 |
+## Features
+
+- Home dashboard with total dividends, monthly insights, recent activity, and a monthly dividend chart
+- Portfolio view with account filters, holdings, live price-based valuation, and KRW/USD conversion
+- Account management with broker logos, masked account numbers, domestic/overseas labels, and linked holdings
+- Dividend history with account filters, account-based summaries, edit/delete swipe actions, and analytics
+- Stock and broker logo support with fallback monogram badges
+- Android app icon and splash screen customization
+- REST API integration with bearer-token authentication
+
+## Tech Stack
+
+| Area | Technology |
 | --- | --- |
-| Framework | Flutter 3.41+ / Dart 3.11+ |
-| 상태관리 | Riverpod 2.6 |
-| HTTP | Dio 5.x |
-| 차트 | fl_chart 0.70 |
-| 캐시 | shared_preferences (30분 TTL) |
-| 백엔드 | fly.io 배포 REST API |
+| Framework | Flutter / Dart |
+| State management | Riverpod |
+| HTTP client | Dio |
+| Charts | fl_chart |
+| Local cache | shared_preferences |
+| Platform | Android |
+| Backend | REST API deployed on Fly.io |
 
-## 사전 준비
+## Requirements
 
-### 1. Flutter 설치 확인
+- Flutter SDK
+- Android Studio or Android SDK tools
+- A running Android emulator or Android device
+- API key for the backend service
 
-```bash
-D:\flutter\bin\flutter doctor
-```
+## Environment Variables
 
-모든 항목에 ✓ 표시가 있어야 합니다.
-
-### 2. 환경변수 파일 생성
-
-프로젝트 루트에 `.env.json` 파일을 생성합니다. (`.gitignore`에 포함되어 있어 저장소에 올라가지 않습니다.)
+Create a `.env.json` file in the project root.
 
 ```json
 {
-  "API_KEY": "여기에_API_키_입력"
+  "API_KEY": "your_api_key_here"
 }
 ```
 
-### 3. 패키지 설치
+The file is ignored by Git and should not be committed.
+
+## Install Dependencies
 
 ```bash
-D:\flutter\bin\flutter pub get
+flutter pub get
 ```
 
----
-
-## 실행 방법
-
-### 크롬 브라우저에서 실행
-
-개발 및 디버깅에 적합합니다.
+## Run on Android Emulator
 
 ```bash
-D:\flutter\bin\flutter run -d chrome --dart-define-from-file=.env.json
+flutter run -d emulator-5554 --dart-define-from-file=.env.json
 ```
 
-> 실행 후 크롬 개발자 도구(F12)에서 콘솔 로그 및 네트워크 요청을 확인할 수 있습니다.
-
----
-
-### Android Studio에서 실행
-
-#### 에뮬레이터 실행
-
-1. Android Studio 실행
-2. 상단 메뉴 → **Tools &gt; Device Manager** → 에뮬레이터 생성 및 시작
-3. 터미널에서 실행:
+If only one device is connected, you can omit the device id.
 
 ```bash
-D:\flutter\bin\flutter run --dart-define-from-file=.env.json
+flutter run --dart-define-from-file=.env.json
 ```
 
-> 에뮬레이터가 1개만 연결된 경우 자동으로 선택됩니다.
-
-#### Android Studio Run 버튼으로 실행
-
-1. Android Studio에서 프로젝트 열기
-
-2. **Edit Configurations** (상단 드롭다운 옆 연필 아이콘)
-
-3. **Additional run args** 에 입력:
-
-   ```
-   --dart-define-from-file=.env.json
-   ```
-
-4. ▶ Run 버튼 클릭
-
----
-
-### 실제 안드로이드 기기에서 실행
-
-#### USB 연결 (디버그 모드)
-
-1. 안드로이드 기기에서 **개발자 옵션** 활성화
-
-   - 설정 → 휴대폰 정보 → 빌드 번호를 7번 연속 탭
-   - 설정 → 개발자 옵션 → **USB 디버깅** 켜기
-
-2. USB 케이블로 PC와 기기 연결
-
-3. 기기에서 "USB 디버깅 허용" 팝업 → **허용**
-
-4. 연결 확인:
-
-   ```bash
-   D:\flutter\bin\flutter devices
-   ```
-
-5. 실행:
-
-   ```bash
-   D:\flutter\bin\flutter run --dart-define-from-file=.env.json
-   ```
-
-#### APK 빌드 후 설치
-
-기기에 직접 APK 파일을 전송하여 설치하는 방법입니다.
+## Build APK
 
 ```bash
-D:\flutter\bin\flutter build apk --release --dart-define-from-file=.env.json
+flutter build apk --dart-define-from-file=.env.json
 ```
 
-빌드 완료 후 APK 경로:
+The APK will be generated at:
 
-```
-build\app\outputs\flutter-apk\app-release.apk
-```
-
-APK 파일을 카카오톡, 이메일, 구글 드라이브 등으로 기기에 전송한 뒤 설치합니다.
-
-> **설치 전 주의**: 기기 설정 → 보안 → **출처를 알 수 없는 앱 설치** 허용 필요
-
----
-
-## 트러블슈팅
-
-### APK 빌드 시 Gradle 캐시 오류
-
-**증상**
-
-```
-Failed to transform kotlin-compiler-embeddable-2.0.21.jar
-Could not serialize types map to a file: ...instrumentation-dependencies.bin
+```text
+build/app/outputs/flutter-apk/app-release.apk
 ```
 
-**원인**: Gradle 캐시 파일이 손상된 경우 발생합니다.
+## Project Structure
 
-**해결 방법**: Gradle 캐시 전체를 삭제 후 재빌드합니다. (삭제 후 첫 빌드 시 의존성을 다시 다운로드하므로 5\~10분 소요)
-
-Windows PowerShell:
-
-```powershell
-Remove-Item -Recurse -Force "$env:USERPROFILE\.gradle\caches"
-```
-
-Git Bash:
-
-```bash
-rm -rf ~/.gradle/caches/
-```
-
-삭제 후 다시 빌드:
-
-```bash
-flutter build apk --release --dart-define-from-file=.env.json
-```
-
----
-
-## 프로젝트 구조
-
-```
+```text
 lib/
 ├── core/
-│   ├── constants.dart          # API URL, API 키 상수
-│   └── theme/app_theme.dart    # 색상, 테마
+│   ├── constants.dart
+│   └── theme/app_theme.dart
 ├── models/
 │   ├── account.dart
 │   ├── asset.dart
 │   ├── dividend.dart
 │   └── transaction.dart
-├── services/
-│   ├── api_service.dart        # Dio 기반 HTTP 클라이언트
-│   └── cache_service.dart      # SharedPreferences 캐시 (30분 TTL)
 ├── providers/
 │   ├── account_provider.dart
 │   ├── asset_provider.dart
 │   ├── dividend_provider.dart
-│   └── price_provider.dart     # 현재가 (5분 TTL 자동 갱신)
-└── screens/
-    ├── home/home_screen.dart
-    ├── portfolio/
-    │   ├── portfolio_screen.dart
-    │   └── asset_detail_sheet.dart
-    ├── accounts/accounts_screen.dart
-    └── dividends/dividends_screen.dart
+│   └── price_provider.dart
+├── screens/
+│   ├── accounts/
+│   ├── dividends/
+│   ├── home/
+│   └── portfolio/
+├── services/
+│   ├── api_service.dart
+│   └── cache_service.dart
+└── widgets/
 ```
 
-## 환경 설정 참고
+## API Configuration
 
-| 항목 | 값 |
+| Item | Value |
 | --- | --- |
-| API 서버 | `https://stock-manager-api-patient-cloud-8941.fly.dev/api` |
-| 인증 방식 | `Authorization: Bearer {API_KEY}` |
-| 가격 캐시 TTL | 5분 |
-| 오프라인 캐시 TTL | 30분 |
+| Authentication | `Authorization: Bearer {API_KEY}` |
+| API key source | `.env.json` via `--dart-define-from-file` |
+| Price refresh behavior | Cached and periodically refreshed by providers |
+| Offline cache | SharedPreferences-based local cache |
+
+## Release
+
+The first public APK is available from the GitHub release page:
+
+[Download v1.0.0](https://github.com/suslmk-lee/stock-manager-mobile/releases/tag/v1.0.0)
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
