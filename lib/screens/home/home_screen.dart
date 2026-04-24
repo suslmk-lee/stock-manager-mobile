@@ -8,7 +8,9 @@ import '../../providers/dividend_provider.dart';
 import '../../providers/price_provider.dart';
 
 class HomeScreen extends ConsumerWidget {
-  const HomeScreen({super.key});
+  final VoidCallback? onViewAllDividends;
+
+  const HomeScreen({super.key, this.onViewAllDividends});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -70,7 +72,10 @@ class HomeScreen extends ConsumerWidget {
             monthlyAsync.when(
               loading: () => const _ChartSkeleton(),
               error: (_, p1) => const SizedBox.shrink(),
-              data: (monthly) => _MonthlyChart(data: monthly),
+              data: (monthly) => _MonthlyChart(
+                data: monthly,
+                exchangeRate: exchangeRateAsync.valueOrNull,
+              ),
             ),
             const SizedBox(height: 24),
             // Recent Activity
@@ -84,7 +89,7 @@ class HomeScreen extends ConsumerWidget {
                       color: AppColors.textPrimary,
                     )),
                 TextButton(
-                  onPressed: () {},
+                  onPressed: onViewAllDividends,
                   child: const Text('View All',
                       style: TextStyle(
                         color: AppColors.primary,
@@ -113,15 +118,17 @@ class HomeScreen extends ConsumerWidget {
 }
 
 // ── 월별 차트 ──────────────────────────────────────────
-class _MonthlyChart extends StatefulWidget {
+class _MonthlyChart extends ConsumerStatefulWidget {
   final List<MonthlyDividend> data;
-  const _MonthlyChart({required this.data});
+  final double? exchangeRate;
+
+  const _MonthlyChart({required this.data, required this.exchangeRate});
 
   @override
-  State<_MonthlyChart> createState() => _MonthlyChartState();
+  ConsumerState<_MonthlyChart> createState() => _MonthlyChartState();
 }
 
-class _MonthlyChartState extends State<_MonthlyChart> {
+class _MonthlyChartState extends ConsumerState<_MonthlyChart> {
   int _touchedIndex = -1;
 
   List<MonthlyDividend> get _recent {
@@ -138,15 +145,39 @@ class _MonthlyChartState extends State<_MonthlyChart> {
     }
   }
 
+  double _displayValue(MonthlyDividend item, bool showKrw) {
+    final rate = widget.exchangeRate;
+    if (showKrw) {
+      return rate != null
+          ? item.totalUsd * rate + item.totalKrw
+          : item.totalKrw;
+    }
+
+    return rate != null ? item.totalUsd + item.totalKrw / rate : item.totalUsd;
+  }
+
+  String _formatValue(double value, bool showKrw) {
+    if (showKrw) {
+      return '₩${NumberFormat('#,###').format(value.round())}';
+    }
+    return '\$${NumberFormat('#,##0.00').format(value)}';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final showKrw = ref.watch(homeCurrencyProvider);
     final data = _recent;
     if (data.isEmpty) return const SizedBox.shrink();
 
-    final maxVal = data.map((e) => e.totalUsd).reduce((a, b) => a > b ? a : b);
+    final maxVal = data
+        .map((e) => _displayValue(e, showKrw))
+        .reduce((a, b) => a > b ? a : b);
     final touched = _touchedIndex >= 0 && _touchedIndex < data.length
         ? data[_touchedIndex]
         : null;
+    final touchedValue = touched == null
+        ? null
+        : _formatValue(_displayValue(touched, showKrw), showKrw);
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
@@ -174,7 +205,7 @@ class _MonthlyChartState extends State<_MonthlyChart> {
                   duration: const Duration(milliseconds: 200),
                   child: Text(
                     key: ValueKey(touched.month),
-                    '\$${NumberFormat('#,##0.00').format(touched.totalUsd)}',
+                    touchedValue!,
                     style: const TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
@@ -248,7 +279,7 @@ class _MonthlyChartState extends State<_MonthlyChart> {
                     x: e.key,
                     barRods: [
                       BarChartRodData(
-                        toY: e.value.totalUsd,
+                        toY: _displayValue(e.value, showKrw),
                         color: isTouched ? AppColors.primary : AppColors.primary.withValues(alpha: 0.3),
                         width: 14,
                         borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
@@ -722,20 +753,7 @@ class _ActivityItem extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // 아이콘
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: _isKrw ? const Color(0x3322C55E) : AppColors.primaryDim,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              Icons.payments_rounded,
-              color: _isKrw ? AppColors.positive : AppColors.primary,
-              size: 20,
-            ),
-          ),
+          _ActivityLogoBadge(dividend: dividend),
           const SizedBox(width: 12),
           // 종목 + 계좌 정보
           Expanded(
@@ -806,6 +824,83 @@ class _ActivityItem extends StatelessWidget {
     } catch (_) {
       return date;
     }
+  }
+}
+
+class _ActivityLogoBadge extends StatelessWidget {
+  final Dividend dividend;
+
+  const _ActivityLogoBadge({required this.dividend});
+
+  String? get _logoUrl {
+    final stored = dividend.logoUrl?.trim() ?? '';
+    if (stored.isNotEmpty) return stored;
+
+    final ticker = dividend.ticker?.trim().toUpperCase() ?? '';
+    if (ticker.isEmpty) return null;
+
+    return 'https://financialmodelingprep.com/image-stock/${Uri.encodeComponent(ticker)}.png';
+  }
+
+  String get _fallbackText {
+    final source = dividend.ticker?.trim().isNotEmpty == true
+        ? dividend.ticker!.trim()
+        : (dividend.assetName ?? '').trim();
+    final cleaned = source.replaceAll(RegExp(r'[^A-Za-z0-9가-힣]'), '');
+    if (cleaned.isEmpty) return '?';
+
+    return String.fromCharCodes(cleaned.runes.take(2)).toUpperCase();
+  }
+
+  Widget _fallback() {
+    return Center(
+      child: Text(
+        _fallbackText,
+        style: const TextStyle(
+          color: Color(0xFFD1D5DB),
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          letterSpacing: -0.4,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final logoUrl = _logoUrl;
+
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: const Color(0x332E3340),
+        borderRadius: BorderRadius.circular(13),
+      ),
+      child: Center(
+        child: Container(
+          width: 30,
+          height: 30,
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: const Color(0xFF2B2F3A),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFF3B4150), width: 1),
+          ),
+          child: logoUrl == null
+              ? _fallback()
+              : Image.network(
+                  logoUrl,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => _fallback(),
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return _fallback();
+                  },
+                ),
+        ),
+      ),
+    );
   }
 }
 

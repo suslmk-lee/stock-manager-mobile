@@ -39,5 +39,5 @@ final tickerPricesProvider =
 // KRW/USD 토글 (true = KRW)
 final portfolioCurrencyProvider = StateProvider<bool>((ref) => true);
 
-// Home 화면 배당금 통화 토글 (true = KRW)
-final homeCurrencyProvider = StateProvider<bool>((ref) => false);
+// Home 화면도 포트폴리오와 같은 통화 기준을 공유합니다. (true = KRW)
+final homeCurrencyProvider = portfolioCurrencyProvider;

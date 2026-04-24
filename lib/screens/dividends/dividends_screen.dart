@@ -73,13 +73,20 @@ class _DividendsScreenState extends ConsumerState<DividendsScreen>
 
 // ─── History Tab ────────────────────────────────────────────────────────────
 
-class _HistoryTab extends ConsumerWidget {
+class _HistoryTab extends ConsumerStatefulWidget {
   const _HistoryTab();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final recentAsync = ref.watch(recentDividendsProvider);
-    final statsAsync = ref.watch(dividendStatsProvider);
+  ConsumerState<_HistoryTab> createState() => _HistoryTabState();
+}
+
+class _HistoryTabState extends ConsumerState<_HistoryTab> {
+  int? _selectedAccountId;
+  final Set<int> _collapsedAccountIds = <int>{};
+
+  @override
+  Widget build(BuildContext context) {
+    final allAsync = ref.watch(allDividendsProvider);
 
     return RefreshIndicator(
       onRefresh: () async {
@@ -91,46 +98,63 @@ class _HistoryTab extends ConsumerWidget {
       child: Column(
         children: [
           // 요약 카드
-          statsAsync.when(
+          allAsync.when(
             loading: () => const SizedBox(
               height: 80,
               child: Center(child: CircularProgressIndicator()),
             ),
             error: (_, __) => const SizedBox.shrink(),
-            data: (stats) => Container(
-              margin: const EdgeInsets.all(16),
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.primaryDim, width: 1),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _SummaryItem(
-                      label: 'USD 배당',
-                      value:
-                          '\$${NumberFormat('#,##0.00').format(stats.totalDividendsUsd)}',
-                      color: AppColors.primary,
+            data: (dividends) {
+              final validSelectedAccountId =
+                  dividends.any((d) => d.accountId == _selectedAccountId)
+                  ? _selectedAccountId
+                  : null;
+              final summaryDividends = validSelectedAccountId == null
+                  ? dividends
+                  : dividends
+                        .where((d) => d.accountId == validSelectedAccountId)
+                        .toList();
+              final totalUsd = summaryDividends
+                  .where((d) => d.currency == 'USD')
+                  .fold(0.0, (sum, d) => sum + d.amount);
+              final totalKrw = summaryDividends
+                  .where((d) => d.currency == 'KRW')
+                  .fold(0.0, (sum, d) => sum + d.amount);
+
+              return Container(
+                margin: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.primaryDim, width: 1),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _SummaryItem(
+                        label: 'USD 배당',
+                        value: '\$${NumberFormat('#,##0.00').format(totalUsd)}',
+                        color: AppColors.primary,
+                      ),
                     ),
-                  ),
-                  Container(width: 1, height: 40, color: AppColors.border),
-                  Expanded(
-                    child: _SummaryItem(
-                      label: 'KRW 배당',
-                      value:
-                          '₩${NumberFormat('#,###').format(stats.totalDividendsKrw.round())}',
-                      color: AppColors.positive,
+                    Container(width: 1, height: 40, color: AppColors.border),
+                    Expanded(
+                      child: _SummaryItem(
+                        label: 'KRW 배당',
+                        value:
+                            '₩${NumberFormat('#,###').format(totalKrw.round())}',
+                        color: AppColors.positive,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ),
+                  ],
+                ),
+              );
+            },
           ),
           // 목록
           Expanded(
-            child: recentAsync.when(
+            child: allAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(child: Text('오류: $e')),
               data: (dividends) {
@@ -142,6 +166,56 @@ class _HistoryTab extends ConsumerWidget {
                     ),
                   );
                 }
+
+                final accountOptions = <_AccountFilterOption>[];
+                final accountIdSet = <int>{};
+                for (final d in dividends) {
+                  if (accountIdSet.contains(d.accountId)) continue;
+                  accountIdSet.add(d.accountId);
+
+                  final accountName = (d.accountName ?? '').trim();
+                  final broker = (d.accountBroker ?? '').trim();
+                  String label = accountName.isNotEmpty
+                      ? accountName
+                      : '계좌 ${d.accountId}';
+                  if (broker.isNotEmpty &&
+                      !label.toLowerCase().contains(broker.toLowerCase())) {
+                    label = '$broker · $label';
+                  }
+                  accountOptions.add(
+                    _AccountFilterOption(id: d.accountId, label: label),
+                  );
+                }
+                accountOptions.sort((a, b) => a.label.compareTo(b.label));
+
+                final selectedAccountId =
+                    accountIdSet.contains(_selectedAccountId)
+                    ? _selectedAccountId
+                    : null;
+                if (selectedAccountId != _selectedAccountId) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) setState(() => _selectedAccountId = null);
+                  });
+                }
+
+                final filteredDividends = selectedAccountId == null
+                    ? dividends
+                    : dividends
+                          .where((d) => d.accountId == selectedAccountId)
+                          .toList();
+                final groupedDividends = accountOptions
+                    .map((option) {
+                      final items = dividends
+                          .where((d) => d.accountId == option.id)
+                          .toList();
+                      return _AccountDividendGroup(
+                        id: option.id,
+                        label: option.label,
+                        items: items,
+                      );
+                    })
+                    .where((group) => group.items.isNotEmpty)
+                    .toList();
 
                 Future<void> deleteDividend(Dividend dividend) async {
                   final confirm = await showDialog<bool>(
@@ -193,25 +267,261 @@ class _HistoryTab extends ConsumerWidget {
                   }
                 }
 
-                return ListView.separated(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: dividends.length,
-                  separatorBuilder: (_, __) => const Divider(
-                    color: AppColors.cardBorder,
-                    height: 4,
-                    thickness: 1,
-                  ),
-                  itemBuilder: (_, i) => _DividendItem(
-                    dividend: dividends[i],
-                    onEdit: () =>
-                        showAddDividendSheet(context, dividend: dividends[i]),
-                    onDelete: () => deleteDividend(dividends[i]),
-                  ),
+                return Column(
+                  children: [
+                    SizedBox(
+                      height: 42,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        children: [
+                          _AccountFilterChip(
+                            label: '전체',
+                            selected: selectedAccountId == null,
+                            onTap: () =>
+                                setState(() => _selectedAccountId = null),
+                          ),
+                          ...accountOptions.map(
+                            (option) => Padding(
+                              padding: const EdgeInsets.only(left: 8),
+                              child: _AccountFilterChip(
+                                label: option.label,
+                                selected: selectedAccountId == option.id,
+                                onTap: () => setState(
+                                  () => _selectedAccountId = option.id,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Expanded(
+                      child: selectedAccountId == null
+                          ? ListView.separated(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              itemCount: groupedDividends.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(height: 8),
+                              itemBuilder: (_, i) {
+                                final group = groupedDividends[i];
+                                final collapsed = _collapsedAccountIds.contains(
+                                  group.id,
+                                );
+                                return Container(
+                                  decoration: BoxDecoration(
+                                    color: AppColors.surface,
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(
+                                      color: AppColors.cardBorder,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      _AccountGroupHeader(
+                                        label: group.label,
+                                        count: group.items.length,
+                                        collapsed: collapsed,
+                                        onTap: () {
+                                          setState(() {
+                                            if (collapsed) {
+                                              _collapsedAccountIds.remove(
+                                                group.id,
+                                              );
+                                            } else {
+                                              _collapsedAccountIds.add(
+                                                group.id,
+                                              );
+                                            }
+                                          });
+                                        },
+                                      ),
+                                      if (!collapsed)
+                                        ListView.separated(
+                                          shrinkWrap: true,
+                                          physics:
+                                              const NeverScrollableScrollPhysics(),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 2,
+                                          ),
+                                          itemCount: group.items.length,
+                                          separatorBuilder: (_, __) =>
+                                              const Divider(
+                                                color: AppColors.cardBorder,
+                                                height: 4,
+                                                thickness: 1,
+                                              ),
+                                          itemBuilder: (_, j) => _DividendItem(
+                                            dividend: group.items[j],
+                                            onEdit: () => showAddDividendSheet(
+                                              context,
+                                              dividend: group.items[j],
+                                            ),
+                                            onDelete: () =>
+                                                deleteDividend(group.items[j]),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            )
+                          : filteredDividends.isEmpty
+                          ? const Center(
+                              child: Text(
+                                '선택한 계좌의 배당 내역이 없습니다',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            )
+                          : ListView.separated(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              itemCount: filteredDividends.length,
+                              separatorBuilder: (_, __) => const Divider(
+                                color: AppColors.cardBorder,
+                                height: 4,
+                                thickness: 1,
+                              ),
+                              itemBuilder: (_, i) => _DividendItem(
+                                dividend: filteredDividends[i],
+                                onEdit: () => showAddDividendSheet(
+                                  context,
+                                  dividend: filteredDividends[i],
+                                ),
+                                onDelete: () =>
+                                    deleteDividend(filteredDividends[i]),
+                              ),
+                            ),
+                    ),
+                  ],
                 );
               },
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _AccountFilterOption {
+  final int id;
+  final String label;
+  const _AccountFilterOption({required this.id, required this.label});
+}
+
+class _AccountDividendGroup {
+  final int id;
+  final String label;
+  final List<Dividend> items;
+
+  const _AccountDividendGroup({
+    required this.id,
+    required this.label,
+    required this.items,
+  });
+}
+
+class _AccountFilterChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _AccountFilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: selected ? AppColors.primaryDim : AppColors.surfaceHigh,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: selected ? AppColors.primary : AppColors.cardBorder,
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: selected ? AppColors.primary : AppColors.textSecondary,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AccountGroupHeader extends StatelessWidget {
+  final String label;
+  final int count;
+  final bool collapsed;
+  final VoidCallback onTap;
+
+  const _AccountGroupHeader({
+    required this.label,
+    required this.count,
+    required this.collapsed,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            Text(
+              '${count}건',
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              collapsed
+                  ? Icons.keyboard_arrow_down_rounded
+                  : Icons.keyboard_arrow_up_rounded,
+              color: AppColors.textSecondary,
+              size: 18,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -801,35 +1111,7 @@ class _DividendItem extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: AppColors.primaryDim,
-                  borderRadius: BorderRadius.circular(13),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(13),
-                  child: logoUrl == null
-                      ? const Icon(
-                          Icons.account_balance_rounded,
-                          color: AppColors.primary,
-                          size: 20,
-                        )
-                      : Padding(
-                          padding: const EdgeInsets.all(8),
-                          child: Image.network(
-                            logoUrl,
-                            fit: BoxFit.contain,
-                            errorBuilder: (_, __, ___) => const Icon(
-                              Icons.account_balance_rounded,
-                              color: AppColors.primary,
-                              size: 20,
-                            ),
-                          ),
-                        ),
-                ),
-              ),
+              _AssetLogoBadge(logoUrl: logoUrl, ticker: ticker, name: name),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -881,6 +1163,100 @@ class _DividendItem extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AssetLogoBadge extends StatelessWidget {
+  final String? logoUrl;
+  final String ticker;
+  final String name;
+
+  const _AssetLogoBadge({
+    required this.logoUrl,
+    required this.ticker,
+    required this.name,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const badgeOuter = Color(0x332E3340);
+    const badgeInner = Color(0xFF2B2F3A);
+    const badgeBorder = Color(0xFF3B4150);
+
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: badgeOuter,
+        borderRadius: BorderRadius.circular(13),
+      ),
+      child: Center(
+        child: Container(
+          width: 30,
+          height: 30,
+          decoration: BoxDecoration(
+            color: badgeInner,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: badgeBorder),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: logoUrl == null
+                ? _LogoFallbackText(ticker: ticker, name: name)
+                : Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: Image.network(
+                      logoUrl!,
+                      fit: BoxFit.contain,
+                      filterQuality: FilterQuality.medium,
+                      loadingBuilder: (_, child, progress) {
+                        if (progress == null) return child;
+                        return _LogoFallbackText(ticker: ticker, name: name);
+                      },
+                      errorBuilder: (_, __, ___) =>
+                          _LogoFallbackText(ticker: ticker, name: name),
+                    ),
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LogoFallbackText extends StatelessWidget {
+  final String ticker;
+  final String name;
+
+  const _LogoFallbackText({required this.ticker, required this.name});
+
+  String _monogram() {
+    String sanitize(String value) =>
+        value.replaceAll(RegExp(r'[^A-Za-z0-9가-힣]'), '');
+
+    final source = sanitize(ticker).isNotEmpty
+        ? sanitize(ticker)
+        : sanitize(name);
+    if (source.isEmpty) return '•';
+    final chars = source.runes.toList();
+    if (chars.length == 1)
+      return String.fromCharCode(chars.first).toUpperCase();
+    return (String.fromCharCode(chars[0]) + String.fromCharCode(chars[1]))
+        .toUpperCase();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Text(
+        _monogram(),
+        style: const TextStyle(
+          color: Color(0xFFD1D5DB),
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
         ),
       ),
     );

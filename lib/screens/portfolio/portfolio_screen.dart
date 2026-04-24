@@ -47,7 +47,8 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen>
     final assetsAsync = ref.watch(assetsProvider);
 
     return accountsAsync.when(
-      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (e, _) => Scaffold(
         appBar: AppBar(title: const Text('Portfolio')),
         body: ErrorRetry(
@@ -68,8 +69,10 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen>
               unselectedLabelColor: AppColors.textSecondary,
               indicatorColor: AppColors.primary,
               tabs: [
-                const Tab(text: '전체'),
-                ...accounts.map((a) => Tab(text: a.name)),
+                const Tab(height: 56, child: Center(child: Text('전체'))),
+                ...accounts.map(
+                  (a) => Tab(height: 56, child: _AccountTabLabel(account: a)),
+                ),
               ],
             ),
           ),
@@ -88,7 +91,9 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen>
                 controller: _tabController,
                 children: [
                   _AssetList(assets: assets, accountId: null),
-                  ...accounts.map((a) => _AssetList(assets: assets, accountId: a.id)),
+                  ...accounts.map(
+                    (a) => _AssetList(assets: assets, accountId: a.id),
+                  ),
                 ],
               ),
             ),
@@ -101,6 +106,54 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen>
       },
     );
   }
+}
+
+class _AccountTabLabel extends StatelessWidget {
+  final Account account;
+
+  const _AccountTabLabel({required this.account});
+
+  @override
+  Widget build(BuildContext context) {
+    final broker = account.broker.trim();
+    final number = _accountLast4(account.accountNumber);
+    final meta = [
+      if (broker.isNotEmpty) broker,
+      if (number.isNotEmpty) number,
+    ].join(' · ');
+
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 92, maxWidth: 128),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            account.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+          ),
+          if (meta.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              meta,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+String _accountLast4(String value) {
+  final digits = value.replaceAll(RegExp(r'\D'), '');
+  if (digits.length < 4) return digits;
+  return digits.substring(digits.length - 4);
 }
 
 class _AssetList extends ConsumerWidget {
@@ -122,12 +175,16 @@ class _AssetList extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final filtered = accountId == null
         ? assets
-        : assets.where((a) => a.holdings.any((h) => h.accountId == accountId)).toList();
+        : assets
+              .where((a) => a.holdings.any((h) => h.accountId == accountId))
+              .toList();
 
     if (filtered.isEmpty) {
       return const Center(
-        child: Text('보유 자산이 없습니다',
-            style: TextStyle(color: AppColors.textSecondary)),
+        child: Text(
+          '보유 자산이 없습니다',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
       );
     }
 
@@ -165,22 +222,33 @@ class _AssetList extends ConsumerWidget {
           color: AppColors.surface,
           child: Row(
             children: [
-              Text('총 ${filtered.length}종목',
-                  style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontWeight: FontWeight.w500,
-                      fontSize: 13)),
+              Text(
+                '총 ${filtered.length}종목',
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w500,
+                  fontSize: 13,
+                ),
+              ),
               const Spacer(),
-              Text('평가 $totalText',
-                  style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14)),
+              Text(
+                '평가 $totalText',
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                ),
+              ),
               const SizedBox(width: 8),
               GestureDetector(
-                onTap: () => ref.read(portfolioCurrencyProvider.notifier).state = !showKrw,
+                onTap: () =>
+                    ref.read(portfolioCurrencyProvider.notifier).state =
+                        !showKrw,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.primaryDim,
                     borderRadius: BorderRadius.circular(20),
@@ -188,9 +256,10 @@ class _AssetList extends ConsumerWidget {
                   child: Text(
                     showKrw ? 'KRW' : 'USD',
                     style: const TextStyle(
-                        color: AppColors.primary,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700),
+                      color: AppColors.primary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),
@@ -202,10 +271,8 @@ class _AssetList extends ConsumerWidget {
             padding: const EdgeInsets.all(16),
             itemCount: filtered.length,
             separatorBuilder: (_, p1) => const SizedBox(height: 8),
-            itemBuilder: (_, i) => _AssetCard(
-              asset: filtered[i],
-              quantity: _qty(filtered[i]),
-            ),
+            itemBuilder: (_, i) =>
+                _AssetCard(asset: filtered[i], quantity: _qty(filtered[i])),
           ),
         ),
       ],
@@ -217,10 +284,7 @@ class _AssetCard extends ConsumerWidget {
   final Asset asset;
   final double quantity;
 
-  const _AssetCard({
-    required this.asset,
-    required this.quantity,
-  });
+  const _AssetCard({required this.asset, required this.quantity});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -229,114 +293,183 @@ class _AssetCard extends ConsumerWidget {
     return GestureDetector(
       onLongPress: () => showAssetDetailSheet(context, asset),
       child: Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: AppColors.primaryDim,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Center(
-              child: Text(
-                _isKoreanTicker(asset.ticker)
-                    ? asset.name.substring(0, asset.name.length > 3 ? 3 : asset.name.length)
-                    : (asset.ticker.length > 4 ? asset.ticker.substring(0, 4) : asset.ticker),
-                style: const TextStyle(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 11,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _isKoreanTicker(asset.ticker)
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(asset.name,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            _AssetLogoBadge(asset: asset),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _isKoreanTicker(asset.ticker)
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          asset.name,
                           style: const TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 14,
                             color: AppColors.textPrimary,
                           ),
                           maxLines: 1,
-                          overflow: TextOverflow.ellipsis),
-                      Text(asset.ticker,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          asset.ticker,
                           style: const TextStyle(
                             fontSize: 12,
                             color: AppColors.textSecondary,
-                          )),
-                    ],
-                  )
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(asset.ticker,
+                          ),
+                        ),
+                      ],
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          asset.ticker,
                           style: const TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 15,
                             color: AppColors.textPrimary,
-                          )),
-                      Text(asset.name,
+                          ),
+                        ),
+                        Text(
+                          asset.name,
                           style: const TextStyle(
                             fontSize: 12,
                             color: AppColors.textSecondary,
                           ),
                           maxLines: 1,
-                          overflow: TextOverflow.ellipsis),
-                    ],
-                  ),
-          ),
-          priceAsync.when(
-            loading: () => const SizedBox(
-              width: 80,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  SizedBox(
-                    width: 60, height: 14,
-                    child: LinearProgressIndicator(
-                      backgroundColor: AppColors.border,
-                      color: AppColors.primary,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                     ),
-                  ),
-                  SizedBox(height: 4),
-                  SizedBox(
-                    width: 40, height: 11,
-                    child: LinearProgressIndicator(
-                      backgroundColor: AppColors.border,
-                      color: AppColors.primaryDim,
+            ),
+            priceAsync.when(
+              loading: () => const SizedBox(
+                width: 80,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    SizedBox(
+                      width: 60,
+                      height: 14,
+                      child: LinearProgressIndicator(
+                        backgroundColor: AppColors.border,
+                        color: AppColors.primary,
+                      ),
                     ),
-                  ),
-                ],
+                    SizedBox(height: 4),
+                    SizedBox(
+                      width: 40,
+                      height: 11,
+                      child: LinearProgressIndicator(
+                        backgroundColor: AppColors.border,
+                        color: AppColors.primaryDim,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              error: (_, p1) => _PriceColumn(
+                evalValue: null,
+                currentPrice: null,
+                changePercent: null,
+                quantity: quantity,
+              ),
+              data: (price) => _PriceColumn(
+                evalValue: price != null ? quantity * price.price : null,
+                currentPrice: price?.price,
+                changePercent: price?.changePercent,
+                currency: price?.currency ?? 'USD',
+                quantity: quantity,
               ),
             ),
-            error: (_, p1) => _PriceColumn(
-              evalValue: null,
-              currentPrice: null,
-              changePercent: null,
-              quantity: quantity,
-            ),
-            data: (price) => _PriceColumn(
-              evalValue: price != null ? quantity * price.price : null,
-              currentPrice: price?.price,
-              changePercent: price?.changePercent,
-              currency: price?.currency ?? 'USD',
-              quantity: quantity,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ));
+    );
+  }
+}
+
+class _AssetLogoBadge extends StatelessWidget {
+  final Asset asset;
+
+  const _AssetLogoBadge({required this.asset});
+
+  String? get _logoUrl {
+    final stored = asset.logoUrl?.trim() ?? '';
+    if (stored.isNotEmpty) return stored;
+
+    final ticker = asset.ticker.trim().toUpperCase();
+    if (ticker.isEmpty) return null;
+
+    return 'https://financialmodelingprep.com/image-stock/${Uri.encodeComponent(ticker)}.png';
+  }
+
+  String get _fallbackText {
+    final source = asset.ticker.trim().isNotEmpty
+        ? asset.ticker.trim()
+        : asset.name.trim();
+    final cleaned = source.replaceAll(RegExp(r'[^A-Za-z0-9가-힣]'), '');
+    if (cleaned.isEmpty) return '?';
+
+    return String.fromCharCodes(cleaned.runes.take(2)).toUpperCase();
+  }
+
+  Widget _fallback() {
+    return Center(
+      child: Text(
+        _fallbackText,
+        style: const TextStyle(
+          color: Color(0xFFD1D5DB),
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          letterSpacing: -0.4,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final logoUrl = _logoUrl;
+
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: const Color(0x332E3340),
+        borderRadius: BorderRadius.circular(13),
+      ),
+      child: Center(
+        child: Container(
+          width: 30,
+          height: 30,
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: const Color(0xFF2B2F3A),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFF3B4150), width: 1),
+          ),
+          child: logoUrl == null
+              ? _fallback()
+              : Image.network(
+                  logoUrl,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => _fallback(),
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return _fallback();
+                  },
+                ),
+        ),
+      ),
+    );
   }
 }
 
@@ -369,8 +502,8 @@ class _PriceColumn extends StatelessWidget {
     final changeColor = changePercent == null
         ? AppColors.textSecondary
         : isPositive
-            ? AppColors.positive
-            : Colors.red;
+        ? AppColors.positive
+        : Colors.red;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
@@ -388,7 +521,10 @@ class _PriceColumn extends StatelessWidget {
           children: [
             Text(
               '${qtyFmt.format(quantity)}주',
-              style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppColors.textSecondary,
+              ),
             ),
             if (changePercent != null) ...[
               const SizedBox(width: 4),
@@ -402,7 +538,10 @@ class _PriceColumn extends StatelessWidget {
         if (currentPrice != null)
           Text(
             _formatAmount(currentPrice!),
-            style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+            style: const TextStyle(
+              fontSize: 11,
+              color: AppColors.textSecondary,
+            ),
           ),
       ],
     );

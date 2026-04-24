@@ -44,22 +44,22 @@ class MainNavigation extends StatefulWidget {
 class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = const [
-    HomeScreen(),
-    PortfolioScreen(),
-    AccountsScreen(),
-    DividendsScreen(),
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final screens = [
+      HomeScreen(onViewAllDividends: () => setState(() => _currentIndex = 3)),
+      const PortfolioScreen(),
+      const AccountsScreen(),
+      const DividendsScreen(),
+    ];
+
     return Scaffold(
       // 제스처 내비게이션 영역까지 body 확장 후 SafeArea로 자체 처리
       body: SafeArea(
         bottom: false,
         child: IndexedStack(
           index: _currentIndex,
-          children: _screens,
+          children: screens,
         ),
       ),
       bottomNavigationBar: SafeArea(
