@@ -225,7 +225,7 @@ class _AddDividendSheetState extends ConsumerState<_AddDividendSheet> {
             const SizedBox(height: 8),
             accountsAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (_, __) => const SizedBox.shrink(),
+              error: (_, _) => const SizedBox.shrink(),
               data: (accounts) {
                 currentAccount = _resolveAccount(accounts);
                 return _DarkDropdown<Account>(
@@ -248,7 +248,7 @@ class _AddDividendSheetState extends ConsumerState<_AddDividendSheet> {
             const SizedBox(height: 8),
             assetsAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (_, __) => const SizedBox.shrink(),
+              error: (_, _) => const SizedBox.shrink(),
               data: (allAssets) {
                 currentAsset = _resolveAsset(allAssets);
 
@@ -336,7 +336,7 @@ class _AddDividendSheetState extends ConsumerState<_AddDividendSheet> {
                                 shrinkWrap: true,
                                 padding: const EdgeInsets.symmetric(vertical: 4),
                                 itemCount: filtered.length,
-                                separatorBuilder: (_, __) => const Divider(
+                                separatorBuilder: (_, _) => const Divider(
                                   color: AppColors.border,
                                   height: 1,
                                   indent: 14,

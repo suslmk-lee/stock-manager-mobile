@@ -50,6 +50,21 @@ class Dividend {
         json['asset']?['logo_url'] ??
         json['asset']?['logoUrl'],
   );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'account_id': accountId,
+    'asset_id': assetId,
+    'date': date,
+    'amount': amount,
+    'tax': tax,
+    'currency': currency,
+    'is_received': isReceived,
+    'notes': notes,
+    'asset_name': assetName,
+    'ticker': ticker,
+    'logo_url': logoUrl,
+  };
 }
 
 class DividendStats {
@@ -77,6 +92,15 @@ class DividendStats {
     receivedCount: json['received_count'],
     pendingCount: json['pending_count'],
   );
+
+  Map<String, dynamic> toJson() => {
+    'total_dividends_usd': totalDividendsUsd,
+    'total_dividends_krw': totalDividendsKrw,
+    'total_tax_usd': totalTaxUsd,
+    'total_tax_krw': totalTaxKrw,
+    'received_count': receivedCount,
+    'pending_count': pendingCount,
+  };
 }
 
 class MonthlyDividend {
@@ -102,4 +126,11 @@ class MonthlyDividend {
         totalKrw: ((json['total_krw'] ?? 0) as num).toDouble(),
         count: (json['count'] ?? 0) as int,
       );
+
+  Map<String, dynamic> toJson() => {
+    'label': month,
+    'total_usd': totalUsd,
+    'total_krw': totalKrw,
+    'count': count,
+  };
 }

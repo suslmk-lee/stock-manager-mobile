@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/dividend.dart';
 import '../services/api_service.dart';
+import '../services/cache_service.dart';
 
 Future<T> _withRetry<T>(
   Future<T> Function() task, {
@@ -48,7 +49,15 @@ bool _isRetryable(Object error) {
 }
 
 final dividendStatsProvider = FutureProvider<DividendStats>((ref) async {
-  return ref.watch(apiServiceProvider).getDividendStats();
+  final api = ref.watch(apiServiceProvider);
+  return ref
+      .watch(cacheServiceProvider)
+      .fetchWithFallback<DividendStats>(
+        CacheKeys.dividendStats,
+        fetch: api.getDividendStats,
+        toJson: (s) => s.toJson(),
+        fromJson: (json) => DividendStats.fromJson(json),
+      );
 });
 
 final monthlyDividendsProvider = FutureProvider<List<MonthlyDividend>>((
@@ -58,14 +67,23 @@ final monthlyDividendsProvider = FutureProvider<List<MonthlyDividend>>((
   final startDate = '${now.year - 1}-01-01';
   final endDate =
       '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+  final api = ref.watch(apiServiceProvider);
   return ref
-      .watch(apiServiceProvider)
-      .getMonthlyDividends(startDate: startDate, endDate: endDate);
+      .watch(cacheServiceProvider)
+      .fetchWithFallback<List<MonthlyDividend>>(
+        CacheKeys.monthlyDividends,
+        fetch: () =>
+            api.getMonthlyDividends(startDate: startDate, endDate: endDate),
+        toJson: (list) => list.map((m) => m.toJson()).toList(),
+        fromJson: (json) =>
+            (json as List).map((e) => MonthlyDividend.fromJson(e)).toList(),
+      );
 });
 
 // 전체 배당금 (계좌/자산 정보 enriched)
 final allDividendsProvider = FutureProvider<List<Dividend>>((ref) async {
   final api = ref.watch(apiServiceProvider);
+  final cache = ref.watch(cacheServiceProvider);
   final accounts = await _withRetry(() => api.getAccounts());
   final assets = await _withRetry(() => api.getAssets());
 
@@ -76,10 +94,17 @@ final allDividendsProvider = FutureProvider<List<Dividend>>((ref) async {
   // NOTE:
   // 계좌 수가 많을 때 병렬 요청(Future.wait)로 DB connection pool 한도에 걸려
   // 일부 계좌 데이터가 누락될 수 있어 순차 조회로 정확도를 우선합니다.
+  // 재시도 후에도 실패하면 캐시로 대체하고, 캐시도 없으면 집계를 중단합니다.
   for (final account in accounts) {
     List<Dividend> dividends;
     try {
-      dividends = await _withRetry(() => api.getAccountDividends(account.id));
+      dividends = await cache.fetchWithFallback<List<Dividend>>(
+        CacheKeys.accountDividends(account.id),
+        fetch: () => _withRetry(() => api.getAccountDividends(account.id)),
+        toJson: (list) => list.map((d) => d.toJson()).toList(),
+        fromJson: (json) =>
+            (json as List).map((e) => Dividend.fromJson(e)).toList(),
+      );
     } catch (_) {
       throw StateError(
         '정확한 배당 집계를 위해 모든 계좌 조회가 필요합니다. '
@@ -120,5 +145,13 @@ final recentDividendsProvider = FutureProvider<List<Dividend>>((ref) async {
 });
 
 final exchangeRateProvider = FutureProvider<double>((ref) async {
-  return ref.watch(apiServiceProvider).getExchangeRate();
+  final api = ref.watch(apiServiceProvider);
+  return ref
+      .watch(cacheServiceProvider)
+      .fetchWithFallback<double>(
+        CacheKeys.exchangeRate,
+        fetch: api.getExchangeRate,
+        toJson: (rate) => rate,
+        fromJson: (json) => (json as num).toDouble(),
+      );
 });

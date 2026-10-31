@@ -306,7 +306,7 @@ class _TotalDividendCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final _showKrw = ref.watch(homeCurrencyProvider);
+    final showKrw = ref.watch(homeCurrencyProvider);
 
     final rate = exchangeRate;
     final krwToUsd = rate != null && rate > 0 ? stats.totalDividendsKrw / rate : 0.0;
@@ -318,15 +318,15 @@ class _TotalDividendCard extends ConsumerWidget {
     final usdFmt = NumberFormat('#,##0.00');
     final krwFmt = NumberFormat('#,###');
 
-    final mainLabel = _showKrw
+    final mainLabel = showKrw
         ? '₩${krwFmt.format(combinedKrw.round())}'
         : '\$${usdFmt.format(combinedUsd)}';
-    final subLabel = _showKrw
+    final subLabel = showKrw
         ? '\$${usdFmt.format(combinedUsd)}'
         : '₩${krwFmt.format(combinedKrw.round())}';
 
     return GestureDetector(
-      onTap: () => ref.read(homeCurrencyProvider.notifier).state = !_showKrw,
+      onTap: () => ref.read(homeCurrencyProvider.notifier).state = !showKrw,
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
@@ -381,7 +381,7 @@ class _TotalDividendCard extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Center(
-                    child: _showKrw
+                    child: showKrw
                         ? const Text(
                             '₩',
                             style: TextStyle(
@@ -629,7 +629,7 @@ class _InsightCard extends StatelessWidget {
                 child: Icon(icon, color: iconColor, size: 16),
               ),
               const Spacer(),
-              if (badge != null) badge!,
+              ?badge,
             ],
           ),
           const SizedBox(height: 10),
@@ -892,7 +892,7 @@ class _ActivityLogoBadge extends StatelessWidget {
               : Image.network(
                   logoUrl,
                   fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => _fallback(),
+                  errorBuilder: (_, _, _) => _fallback(),
                   loadingBuilder: (context, child, loadingProgress) {
                     if (loadingProgress == null) return child;
                     return _fallback();
@@ -1020,7 +1020,7 @@ class _ShimmerState extends State<_Shimmer> with SingleTickerProviderStateMixin 
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _anim,
-      builder: (_, __) => ShaderMask(
+      builder: (_, _) => ShaderMask(
         blendMode: BlendMode.srcATop,
         shaderCallback: (bounds) => LinearGradient(
           begin: Alignment(_anim.value - 1, 0),

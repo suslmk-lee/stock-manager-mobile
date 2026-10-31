@@ -39,6 +39,24 @@ class CacheService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(key);
   }
+
+  // API 호출 성공 시 캐시 저장, 실패 시 캐시에서 복원 (캐시도 없으면 원래 에러)
+  Future<T> fetchWithFallback<T>(
+    String key, {
+    required Future<T> Function() fetch,
+    required dynamic Function(T) toJson,
+    required T Function(dynamic) fromJson,
+  }) async {
+    try {
+      final data = await fetch();
+      await save(key, toJson(data));
+      return data;
+    } catch (_) {
+      final cached = await load<T>(key, fromJson);
+      if (cached != null) return cached;
+      rethrow;
+    }
+  }
 }
 
 // 캐시 키 상수
@@ -47,4 +65,7 @@ class CacheKeys {
   static const assets = 'cache_assets';
   static const dividendStats = 'cache_dividend_stats';
   static const monthlyDividends = 'cache_monthly_dividends';
+  static const exchangeRate = 'cache_exchange_rate';
+  static String accountDividends(int accountId) =>
+      'cache_account_dividends_$accountId';
 }

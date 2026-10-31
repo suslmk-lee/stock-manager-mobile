@@ -103,8 +103,8 @@ class _AddAssetSheetState extends ConsumerState<_AddAssetSheet> {
           'ticker': ticker,
           'name': name,
           'type': type,
-          if (sector != null) 'sector': sector,
-          if (logoUrl != null) 'logo_url': logoUrl,
+          'sector': ?sector,
+          'logo_url': ?logoUrl,
         });
         assetId = newAsset.id;
       }

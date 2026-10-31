@@ -461,7 +461,7 @@ class _AssetLogoBadge extends StatelessWidget {
               : Image.network(
                   logoUrl,
                   fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => _fallback(),
+                  errorBuilder: (_, _, _) => _fallback(),
                   loadingBuilder: (context, child, loadingProgress) {
                     if (loadingProgress == null) return child;
                     return _fallback();

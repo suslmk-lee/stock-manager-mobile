@@ -103,7 +103,7 @@ class _HistoryTabState extends ConsumerState<_HistoryTab> {
               height: 80,
               child: Center(child: CircularProgressIndicator()),
             ),
-            error: (_, __) => const SizedBox.shrink(),
+            error: (_, _) => const SizedBox.shrink(),
             data: (dividends) {
               final validSelectedAccountId =
                   dividends.any((d) => d.accountId == _selectedAccountId)
@@ -304,7 +304,7 @@ class _HistoryTabState extends ConsumerState<_HistoryTab> {
                                 horizontal: 16,
                               ),
                               itemCount: groupedDividends.length,
-                              separatorBuilder: (_, __) =>
+                              separatorBuilder: (_, _) =>
                                   const SizedBox(height: 8),
                               itemBuilder: (_, i) {
                                 final group = groupedDividends[i];
@@ -349,7 +349,7 @@ class _HistoryTabState extends ConsumerState<_HistoryTab> {
                                             vertical: 2,
                                           ),
                                           itemCount: group.items.length,
-                                          separatorBuilder: (_, __) =>
+                                          separatorBuilder: (_, _) =>
                                               const Divider(
                                                 color: AppColors.cardBorder,
                                                 height: 4,
@@ -384,7 +384,7 @@ class _HistoryTabState extends ConsumerState<_HistoryTab> {
                                 horizontal: 16,
                               ),
                               itemCount: filteredDividends.length,
-                              separatorBuilder: (_, __) => const Divider(
+                              separatorBuilder: (_, _) => const Divider(
                                 color: AppColors.cardBorder,
                                 height: 4,
                                 thickness: 1,
@@ -1216,7 +1216,7 @@ class _AssetLogoBadge extends StatelessWidget {
                         if (progress == null) return child;
                         return _LogoFallbackText(ticker: ticker, name: name);
                       },
-                      errorBuilder: (_, __, ___) =>
+                      errorBuilder: (_, _, _) =>
                           _LogoFallbackText(ticker: ticker, name: name),
                     ),
                   ),
