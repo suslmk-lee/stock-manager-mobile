@@ -2,13 +2,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/asset.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
+import '../services/retry.dart';
 
 final assetsProvider = FutureProvider<List<Asset>>((ref) async {
   final api = ref.watch(apiServiceProvider);
   final cache = ref.watch(cacheServiceProvider);
 
   try {
-    final data = await api.getAssets();
+    final data = await withRetry(() => api.getAssets());
     await cache.save(CacheKeys.assets, data.map((a) => {
       'id': a.id,
       'ticker': a.ticker,

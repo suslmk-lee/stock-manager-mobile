@@ -1,52 +1,10 @@
-import 'dart:async';
-
-import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/dividend.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
-
-Future<T> _withRetry<T>(
-  Future<T> Function() task, {
-  int maxAttempts = 3,
-}) async {
-  Object? lastError;
-  for (var attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      return await task();
-    } catch (e) {
-      lastError = e;
-      if (!_isRetryable(e) || attempt == maxAttempts) {
-        rethrow;
-      }
-      await Future<void>.delayed(Duration(milliseconds: 250 * attempt));
-    }
-  }
-  throw lastError ?? StateError('Unknown error');
-}
-
-bool _isRetryable(Object error) {
-  if (error is! DioException) return false;
-
-  final statusCode = error.response?.statusCode;
-  final body = (error.response?.data ?? '').toString().toLowerCase();
-
-  if (error.type == DioExceptionType.connectionTimeout ||
-      error.type == DioExceptionType.sendTimeout ||
-      error.type == DioExceptionType.receiveTimeout ||
-      error.type == DioExceptionType.connectionError) {
-    return true;
-  }
-  if (statusCode != null && statusCode >= 500) {
-    return true;
-  }
-  if (body.contains('max clients reached') ||
-      body.contains('too many connections') ||
-      body.contains('temporarily unavailable')) {
-    return true;
-  }
-  return false;
-}
+import '../services/retry.dart';
+import 'account_provider.dart';
+import 'asset_provider.dart';
 
 final dividendStatsProvider = FutureProvider<DividendStats>((ref) async {
   final api = ref.watch(apiServiceProvider);
@@ -84,8 +42,10 @@ final monthlyDividendsProvider = FutureProvider<List<MonthlyDividend>>((
 final allDividendsProvider = FutureProvider<List<Dividend>>((ref) async {
   final api = ref.watch(apiServiceProvider);
   final cache = ref.watch(cacheServiceProvider);
-  final accounts = await _withRetry(() => api.getAccounts());
-  final assets = await _withRetry(() => api.getAssets());
+  // 계좌/자산은 공용 provider를 사용합니다. (재시도 + 캐시 fallback 포함, 중복 요청 제거)
+  // 직접 API를 호출하면 오프라인일 때 여기서 먼저 실패해 아래 배당 캐시까지 도달하지 못합니다.
+  final accounts = await ref.watch(accountsProvider.future);
+  final assets = await ref.watch(assetsProvider.future);
 
   final assetMap = {for (final a in assets) a.id: a};
   final accountMap = {for (final a in accounts) a.id: a};
@@ -100,7 +60,7 @@ final allDividendsProvider = FutureProvider<List<Dividend>>((ref) async {
     try {
       dividends = await cache.fetchWithFallback<List<Dividend>>(
         CacheKeys.accountDividends(account.id),
-        fetch: () => _withRetry(() => api.getAccountDividends(account.id)),
+        fetch: () => withRetry(() => api.getAccountDividends(account.id)),
         toJson: (list) => list.map((d) => d.toJson()).toList(),
         fromJson: (json) =>
             (json as List).map((e) => Dividend.fromJson(e)).toList(),

@@ -2,13 +2,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/account.dart';
 import '../services/api_service.dart';
 import '../services/cache_service.dart';
+import '../services/retry.dart';
 
 final accountsProvider = FutureProvider<List<Account>>((ref) async {
   final api = ref.watch(apiServiceProvider);
   final cache = ref.watch(cacheServiceProvider);
 
   try {
-    final data = await api.getAccounts();
+    final data = await withRetry(() => api.getAccounts());
     // 성공 시 캐시 저장
     await cache.save(CacheKeys.accounts, data.map((a) => {
       'id': a.id,

@@ -18,14 +18,33 @@ void main() {
     expect(v, 1);
   });
 
-  test('TTL(30분) 지난 캐시는 null', () async {
-    final old = DateTime.now()
-        .subtract(const Duration(minutes: 31))
-        .millisecondsSinceEpoch;
+  void seedWithAge(Duration age) {
+    final ts = DateTime.now().subtract(age).millisecondsSinceEpoch;
     SharedPreferences.setMockInitialValues({
-      'k': jsonEncode({'data': 1, 'timestamp': old}),
+      'k': jsonEncode({'data': 1, 'timestamp': ts}),
     });
+  }
+
+  test('30분 지난 캐시도 fallback으로 사용 가능', () async {
+    seedWithAge(const Duration(minutes: 31));
+    expect(await cache.load('k', (json) => json as int), 1);
+  });
+
+  test('허용 기간(fallbackMaxAge) 지난 캐시는 null', () async {
+    seedWithAge(CacheService.fallbackMaxAge + const Duration(minutes: 1));
     expect(await cache.load('k', (json) => json as int), isNull);
+  });
+
+  test('maxAge를 지정하면 그 기준으로 만료', () async {
+    seedWithAge(const Duration(minutes: 31));
+    expect(
+      await cache.load(
+        'k',
+        (json) => json as int,
+        maxAge: const Duration(minutes: 30),
+      ),
+      isNull,
+    );
   });
 
   test('손상된 캐시는 null', () async {
@@ -52,6 +71,18 @@ void main() {
     test('실패 시 캐시된 값으로 대체', () async {
       await run(() async => 1380.5);
       expect(await run(() async => throw Exception('offline')), 1380.5);
+    });
+
+    test('캐시 저장이 실패해도 예전 캐시가 아닌 새 데이터를 반환', () async {
+      await run(() async => 1300.0);
+
+      final result = await cache.fetchWithFallback<double>(
+        CacheKeys.exchangeRate,
+        fetch: () async => 1400.0,
+        toJson: (_) => throw const FormatException('serialize failed'),
+        fromJson: (json) => (json as num).toDouble(),
+      );
+      expect(result, 1400.0);
     });
 
     test('실패했는데 캐시도 없으면 원래 에러를 던짐', () async {
