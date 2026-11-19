@@ -15,34 +15,11 @@ import 'asset_detail_sheet.dart';
 bool _isKoreanTicker(String ticker) =>
     ticker.endsWith('.KS') || ticker.endsWith('.KQ');
 
-class PortfolioScreen extends ConsumerStatefulWidget {
+class PortfolioScreen extends ConsumerWidget {
   const PortfolioScreen({super.key});
 
   @override
-  ConsumerState<PortfolioScreen> createState() => _PortfolioScreenState();
-}
-
-class _PortfolioScreenState extends ConsumerState<PortfolioScreen>
-    with SingleTickerProviderStateMixin {
-  TabController? _tabController;
-  List<Account> _accounts = [];
-
-  @override
-  void dispose() {
-    _tabController?.dispose();
-    super.dispose();
-  }
-
-  void _initTabs(List<Account> accounts) {
-    if (_accounts.length != accounts.length) {
-      _tabController?.dispose();
-      _tabController = TabController(length: accounts.length + 1, vsync: this);
-      _accounts = accounts;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final accountsAsync = ref.watch(accountsProvider);
     final assetsAsync = ref.watch(assetsProvider);
 
@@ -56,13 +33,15 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen>
           onRetry: () => ref.invalidate(accountsProvider),
         ),
       ),
-      data: (accounts) {
-        _initTabs(accounts);
-        return Scaffold(
+      // 탭 컨트롤러는 DefaultTabController에 맡깁니다. 계좌 수(탭 수)가 바뀌면
+      // 기존 애니메이션을 재사용해 컨트롤러를 교체하고, 선택 중인 탭이 범위를
+      // 벗어나면 마지막 탭으로 맞춰 줍니다. 계좌가 0개여도 '전체' 탭 하나로 동작합니다.
+      data: (accounts) => DefaultTabController(
+        length: accounts.length + 1,
+        child: Scaffold(
           appBar: AppBar(
             title: const Text('Portfolio'),
             bottom: TabBar(
-              controller: _tabController,
               isScrollable: true,
               tabAlignment: TabAlignment.start,
               labelColor: AppColors.primary,
@@ -88,7 +67,6 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen>
                 onRetry: () => ref.invalidate(assetsProvider),
               ),
               data: (assets) => TabBarView(
-                controller: _tabController,
                 children: [
                   _AssetList(assets: assets, accountId: null),
                   ...accounts.map(
@@ -102,8 +80,8 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen>
             onPressed: () => showAddAssetSheet(context),
             child: const Icon(Icons.add),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }
