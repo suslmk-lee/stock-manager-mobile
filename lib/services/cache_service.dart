@@ -5,7 +5,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 final cacheServiceProvider = Provider<CacheService>((ref) => CacheService());
 
 class CacheService {
-  static const _ttlMinutes = 30; // 30분 캐시
+  // 캐시는 API 실패 시 대체 데이터(fallback)로만 사용합니다.
+  // 30분처럼 짧게 두면 오프라인이 조금만 길어져도 fallback이 사라지므로 넉넉하게 둡니다.
+  // (나중에 "캐시 우선 표시" 같은 신선도 기준이 필요하면 load의 maxAge로 짧게 지정)
+  static const fallbackMaxAge = Duration(days: 7);
 
   Future<void> save(String key, dynamic data) async {
     final prefs = await SharedPreferences.getInstance();
@@ -16,7 +19,11 @@ class CacheService {
     await prefs.setString(key, payload);
   }
 
-  Future<T?> load<T>(String key, T Function(dynamic) fromJson) async {
+  Future<T?> load<T>(
+    String key,
+    T Function(dynamic) fromJson, {
+    Duration maxAge = fallbackMaxAge,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(key);
     if (raw == null) return null;
@@ -26,8 +33,8 @@ class CacheService {
       final timestamp = payload['timestamp'] as int;
       final age = DateTime.now().millisecondsSinceEpoch - timestamp;
 
-      // TTL 초과 시 null 반환
-      if (age > _ttlMinutes * 60 * 1000) return null;
+      // 허용 기간 초과 시 null 반환
+      if (age > maxAge.inMilliseconds) return null;
 
       return fromJson(payload['data']);
     } catch (_) {
@@ -47,15 +54,22 @@ class CacheService {
     required dynamic Function(T) toJson,
     required T Function(dynamic) fromJson,
   }) async {
+    final T data;
     try {
-      final data = await fetch();
-      await save(key, toJson(data));
-      return data;
+      data = await fetch();
     } catch (_) {
       final cached = await load<T>(key, fromJson);
       if (cached != null) return cached;
       rethrow;
     }
+
+    // 저장을 위 try 안에 두면 저장 실패 시 새 데이터를 버리고 예전 캐시를 돌려주게 됩니다.
+    try {
+      await save(key, toJson(data));
+    } catch (_) {
+      // 캐시 저장 실패(직렬화 오류 등)는 무시하고 방금 받은 데이터를 그대로 반환합니다.
+    }
+    return data;
   }
 }
 
