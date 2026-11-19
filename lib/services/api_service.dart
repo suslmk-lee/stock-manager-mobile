@@ -193,4 +193,14 @@ class ApiService {
     final res = await _dio.get('/ticker/price', queryParameters: {'ticker': ticker});
     return res.data;
   }
+
+  // 여러 종목 현재가 일괄 조회. 응답: { "티커": {price, currency, change_percent, ...} }
+  // 조회에 실패한 종목은 응답에서 빠집니다.
+  Future<Map<String, dynamic>> getTickerPrices(List<String> tickers) async {
+    final res = await _dio.get(
+      '/ticker/prices',
+      queryParameters: {'tickers': tickers.join(',')},
+    );
+    return Map<String, dynamic>.from(res.data as Map);
+  }
 }
