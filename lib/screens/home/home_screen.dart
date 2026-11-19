@@ -1,11 +1,28 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
-import '../../core/theme/app_theme.dart';
+import '../../core/format.dart';
+import '../../core/theme/palette.dart';
+import '../../core/theme/typography.dart';
 import '../../models/dividend.dart';
+import '../../providers/account_provider.dart';
+import '../../providers/asset_provider.dart';
 import '../../providers/dividend_provider.dart';
+import '../../providers/portfolio_provider.dart';
 import '../../providers/price_provider.dart';
+import '../../widgets/ui/app_icon.dart';
+import '../../widgets/ui/app_shell.dart';
+import '../../widgets/ui/controls.dart';
+import '../../widgets/ui/logos.dart';
+import '../../widgets/ui/surfaces.dart';
+
+/// 금액 표시: 원화 환산 값을 받아 지금 고른 통화(KRW/USD)로
+String _money(double krw, bool showKrw, double rate) =>
+    showKrw ? fmtKrw(krw) : fmtUsd(rate > 0 ? krw / rate : 0);
+
+String _signedMoney(double krw, bool showKrw, double rate) => showKrw
+    ? fmtSignedMoney(krw, 'KRW')
+    : fmtSignedMoney(rate > 0 ? krw / rate : 0, 'USD');
 
 class HomeScreen extends ConsumerWidget {
   final VoidCallback? onViewAllDividends;
@@ -15,101 +32,403 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final statsAsync = ref.watch(dividendStatsProvider);
-    final exchangeRateAsync = ref.watch(exchangeRateProvider);
-    final recentAsync = ref.watch(recentDividendsProvider);
     final monthlyAsync = ref.watch(monthlyDividendsProvider);
+    final recentAsync = ref.watch(recentDividendsProvider);
+    final rate = ref.watch(exchangeRateProvider).valueOrNull;
 
     return Scaffold(
-      appBar: AppBar(
-        leading: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: CircleAvatar(
-            backgroundColor: AppColors.surfaceHigh,
-            child: Icon(Icons.person, color: AppColors.primary, size: 20),
+      backgroundColor: Colors.transparent,
+      extendBodyBehindAppBar: true,
+      appBar: const AppTopBar(title: BrandTitle()),
+      body: Builder(
+        builder: (context) => RefreshIndicator(
+          edgeOffset: MediaQuery.paddingOf(context).top,
+          onRefresh: () async {
+            ref.invalidate(assetsProvider);
+            ref.invalidate(accountsProvider);
+            ref.invalidate(allTickerPricesProvider);
+            ref.invalidate(exchangeRateProvider);
+            ref.invalidate(dividendStatsProvider);
+            ref.invalidate(monthlyDividendsProvider);
+            ref.invalidate(allDividendsProvider);
+          },
+          child: ListView(
+            padding: listPadding(context, top: 16),
+            children: [
+              const _PortfolioHero(),
+              const SizedBox(height: 14),
+              statsAsync.when(
+                loading: () => const _SkeletonCard(height: 250),
+                error: (e, _) => _ErrorCard(message: e.toString()),
+                data: (stats) => _DividendSummaryCard(
+                  stats: stats,
+                  monthly: monthlyAsync.valueOrNull ?? const [],
+                  rate: rate,
+                  onViewAll: onViewAllDividends,
+                ),
+              ),
+              const SizedBox(height: 14),
+              monthlyAsync.when(
+                loading: () => const _SkeletonCard(height: 230),
+                error: (_, _) => const SizedBox.shrink(),
+                data: (monthly) =>
+                    _MonthlyChartCard(monthly: monthly, rate: rate),
+              ),
+              const SizedBox(height: 14),
+              recentAsync.when(
+                loading: () => const _SkeletonCard(height: 220),
+                error: (e, _) => _ErrorCard(message: e.toString()),
+                data: (list) => _RecentDividendsCard(
+                  dividends: list,
+                  onViewAll: onViewAllDividends,
+                ),
+              ),
+            ],
           ),
         ),
-        title: const Text('Home'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_none_rounded),
-            onPressed: () {},
-            color: AppColors.textSecondary,
+      ),
+    );
+  }
+}
+
+// ── 총 자산 평가액 (그레인 히어로) ──────────────────────────────
+class _PortfolioHero extends ConsumerWidget {
+  const _PortfolioHero();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final p = context.pal;
+    final showKrw = ref.watch(homeCurrencyProvider);
+    final snapshotAsync = ref.watch(portfolioProvider(null));
+    final accounts = ref.watch(accountsProvider).valueOrNull;
+
+    return HeroCard(
+      child: snapshotAsync.when(
+        loading: () => const _HeroPlaceholder(),
+        error: (e, _) => Text(
+          '보유 종목을 불러오지 못했습니다\n${_ErrorCard.display(e.toString())}',
+          style: AppText.body(p, size: 13, color: p.rose.s300),
+        ),
+        data: (snap) {
+          final t = snap.totals;
+          final rate = snap.rate;
+          final loading = snap.pricesLoading;
+          final intlAccounts = accounts
+              ?.where((a) => a.marketType == 'International')
+              .length;
+          final domesticAccounts = accounts == null
+              ? null
+              : accounts.length - intlAccounts!;
+          final domesticPct = (t.domesticShare * 100).round();
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text('총 자산 평가액', style: AppText.label(p, color: p.zinc.s400)),
+                  const SizedBox(width: 8),
+                  MonoChip(
+                    label: showKrw ? 'KRW 환산' : 'USD 환산',
+                    onTap: () => ref.read(homeCurrencyProvider.notifier).state =
+                        !showKrw,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              if (loading)
+                const _Bar(width: 210, height: 34)
+              else
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    _money(t.valueKrw, showKrw, rate),
+                    style: AppText.bigNumber(p, size: 36),
+                  ),
+                ),
+              const SizedBox(height: 10),
+              Text(
+                loading
+                    ? '현재가를 불러오는 중…'
+                    : '투자 원금 ${_money(t.costKrw, showKrw, rate)}',
+                style: AppText.num(p, size: 13, color: p.zinc.s400),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: _DeltaPanel(
+                      label: '평가손익',
+                      amount: loading
+                          ? null
+                          : _signedMoney(t.profitKrw, showKrw, rate),
+                      pct: t.profitPct,
+                      positive: t.profitKrw >= 0,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _DeltaPanel(
+                      label: '오늘',
+                      amount: loading
+                          ? null
+                          : _signedMoney(t.todayChangeKrw, showKrw, rate),
+                      pct: t.todayPct,
+                      positive: t.todayChangeKrw >= 0,
+                    ),
+                  ),
+                ],
+              ),
+              if (!loading && t.valueKrw > 0) ...[
+                const SizedBox(height: 16),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(99),
+                  child: SizedBox(
+                    height: 6,
+                    child: Row(
+                      children: [
+                        if (t.domesticKrw > 0)
+                          Expanded(
+                            flex: (t.domesticShare * 1000).round().clamp(
+                              1,
+                              1000,
+                            ),
+                            child: ColoredBox(color: p.mint.s400),
+                          ),
+                        if (t.domesticKrw > 0 && t.overseasKrw > 0)
+                          const SizedBox(width: 2),
+                        if (t.overseasKrw > 0)
+                          Expanded(
+                            flex: ((1 - t.domesticShare) * 1000).round().clamp(
+                              1,
+                              1000,
+                            ),
+                            child: ColoredBox(
+                              color: p.sky.s400.withValues(alpha: 0.7),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    _Dot(color: p.mint.s400),
+                    const SizedBox(width: 6),
+                    Text(
+                      '국내 $domesticPct%${domesticAccounts != null ? ' · $domesticAccounts계좌' : ''}',
+                      style: AppText.label(p),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '해외 ${100 - domesticPct}%${intlAccounts != null ? ' · $intlAccounts계좌' : ''}',
+                      style: AppText.label(p),
+                    ),
+                    const SizedBox(width: 6),
+                    _Dot(color: p.sky.s400),
+                  ],
+                ),
+              ],
+              if (!loading && t.pricedCount < t.assetCount) ...[
+                const SizedBox(height: 10),
+                Text(
+                  '현재가 ${t.assetCount}종목 중 ${t.pricedCount}종목 반영',
+                  style: AppText.label(p, color: p.amber.s300),
+                ),
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _DeltaPanel extends StatelessWidget {
+  final String label;
+  final String? amount;
+  final double? pct;
+  final bool positive;
+
+  const _DeltaPanel({
+    required this.label,
+    required this.amount,
+    required this.pct,
+    required this.positive,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pal;
+    final color = positive ? p.mint.s300 : p.rose.s300;
+    return InsetPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: AppText.label(p)),
+          const SizedBox(height: 5),
+          if (amount == null)
+            const _Bar(width: 90, height: 16)
+          else
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                amount!,
+                style: AppText.num(p, size: 16, color: color),
+              ),
+            ),
+          const SizedBox(height: 2),
+          Text(
+            amount == null || pct == null ? ' ' : fmtSignedPct(pct!),
+            style: AppText.num(
+              p,
+              size: 11,
+              color: color.withValues(alpha: 0.8),
+            ),
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          ref.invalidate(dividendStatsProvider);
-          ref.invalidate(exchangeRateProvider);
-          ref.invalidate(recentDividendsProvider);
-          ref.invalidate(monthlyDividendsProvider);
-        },
-        child: ListView(
-          padding: const EdgeInsets.all(16),
+    );
+  }
+}
+
+class _HeroPlaceholder extends StatelessWidget {
+  const _HeroPlaceholder();
+
+  @override
+  Widget build(BuildContext context) => const Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      _Bar(width: 110, height: 12),
+      SizedBox(height: 18),
+      _Bar(width: 220, height: 34),
+      SizedBox(height: 12),
+      _Bar(width: 150, height: 12),
+      SizedBox(height: 18),
+      Row(
+        children: [
+          Expanded(child: _Bar(height: 70)),
+          SizedBox(width: 8),
+          Expanded(child: _Bar(height: 70)),
+        ],
+      ),
+    ],
+  );
+}
+
+// ── 누적 배당금 ──────────────────────────────────────────
+class _DividendSummaryCard extends ConsumerWidget {
+  final DividendStats stats;
+  final List<MonthlyDividend> monthly;
+  final double? rate;
+  final VoidCallback? onViewAll;
+
+  const _DividendSummaryCard({
+    required this.stats,
+    required this.monthly,
+    required this.rate,
+    this.onViewAll,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final p = context.pal;
+    final showKrw = ref.watch(homeCurrencyProvider);
+    final r = rate ?? fallbackUsdKrw;
+    final totalKrw = stats.totalDividendsUsd * r + stats.totalDividendsKrw;
+
+    final insights = _MonthlyInsights.from(monthly, r);
+
+    return GestureDetector(
+      onTap: () => ref.read(homeCurrencyProvider.notifier).state = !showKrw,
+      child: GlassCard(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 총 배당금 카드
-            statsAsync.when(
-              loading: () => const _StatCardSkeleton(),
-              error: (e, _) => _ErrorCard(message: e.toString()),
-              data: (stats) => exchangeRateAsync.when(
-                loading: () => _TotalDividendCard(stats: stats, exchangeRate: null),
-                error: (_, p1) => _TotalDividendCard(stats: stats, exchangeRate: null),
-                data: (rate) => _TotalDividendCard(stats: stats, exchangeRate: rate),
-              ),
+            CardHeader(
+              glyph: AppGlyph.coin,
+              title: '누적 배당금',
+              statLabel: true,
+              trailing: TextLink(label: '배당 기록', onTap: onViewAll),
             ),
             const SizedBox(height: 12),
-            // 월별 인사이트 2x2 그리드
-            monthlyAsync.when(
-              loading: () => const _InsightGridSkeleton(),
-              error: (_, p1) => const SizedBox.shrink(),
-              data: (monthly) => _MonthlyInsights(
-                monthly: monthly,
-                exchangeRate: exchangeRateAsync.valueOrNull,
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                _money(totalKrw, showKrw, r),
+                style: AppText.bigNumber(p, size: 30),
               ),
             ),
-            const SizedBox(height: 20),
-            // 월별 분배금 차트
-            monthlyAsync.when(
-              loading: () => const _ChartSkeleton(),
-              error: (_, p1) => const SizedBox.shrink(),
-              data: (monthly) => _MonthlyChart(
-                data: monthly,
-                exchangeRate: exchangeRateAsync.valueOrNull,
-              ),
+            const SizedBox(height: 8),
+            Text(
+              [
+                'KRW ${fmtKrw(stats.totalDividendsKrw)}',
+                'USD ${fmtUsd(stats.totalDividendsUsd)}',
+                if (rate != null) '환율 ${fmtQty(rate!.round())}',
+              ].join(' · '),
+              style: AppText.label(p),
             ),
-            const SizedBox(height: 24),
-            // Recent Activity
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Recent Activity',
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    )),
-                TextButton(
-                  onPressed: onViewAllDividends,
-                  child: const Text('View All',
-                      style: TextStyle(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w600,
-                      )),
-                ),
-              ],
-            ),
-            recentAsync.when(
-              loading: () => const _ActivitySkeleton(),
-              error: (e, _) => _ErrorCard(message: e.toString()),
-              data: (dividends) => dividends.isEmpty
-                  ? const _EmptyActivity()
-                  : Column(
-                      children: dividends
-                          .take(3)
-                          .map((d) => _ActivityItem(dividend: d))
-                          .toList(),
+            if (insights != null) ...[
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: _MiniStat(
+                      label: '이번 달',
+                      value: insights.thisMonthKrw == null
+                          ? '—'
+                          : _money(insights.thisMonthKrw!, showKrw, r),
+                      badge: insights.momPct == null
+                          ? null
+                          : StatusBadge(
+                              label:
+                                  '${insights.momPct!.abs().toStringAsFixed(1)}%',
+                              tone: insights.momPct! >= 0
+                                  ? BadgeTone.mint
+                                  : BadgeTone.rose,
+                              icon: insights.momPct! >= 0
+                                  ? Icons.keyboard_arrow_up_rounded
+                                  : Icons.keyboard_arrow_down_rounded,
+                            ),
                     ),
-            ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _MiniStat(
+                      label: '월평균',
+                      value: _money(insights.averageKrw, showKrw, r),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: _MiniStat(
+                      label: insights.lastMonthLabel == null
+                          ? '지난달'
+                          : '지난달 · ${insights.lastMonthLabel}',
+                      value: insights.lastMonthKrw == null
+                          ? '—'
+                          : _money(insights.lastMonthKrw!, showKrw, r),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _MiniStat(
+                      label: '최고 달 · ${insights.bestLabel}',
+                      value: _money(insights.bestKrw, showKrw, r),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
@@ -117,146 +436,232 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-// ── 월별 차트 ──────────────────────────────────────────
-class _MonthlyChart extends ConsumerStatefulWidget {
-  final List<MonthlyDividend> data;
-  final double? exchangeRate;
+class _MiniStat extends StatelessWidget {
+  final String label;
+  final String value;
+  final Widget? badge;
 
-  const _MonthlyChart({required this.data, required this.exchangeRate});
-
-  @override
-  ConsumerState<_MonthlyChart> createState() => _MonthlyChartState();
-}
-
-class _MonthlyChartState extends ConsumerState<_MonthlyChart> {
-  int _touchedIndex = -1;
-
-  List<MonthlyDividend> get _recent {
-    final sorted = [...widget.data]..sort((a, b) => a.month.compareTo(b.month));
-    return sorted.length > 12 ? sorted.sublist(sorted.length - 12) : sorted;
-  }
-
-  String _shortMonth(String month) {
-    try {
-      final dt = DateTime.parse('$month-01');
-      return DateFormat('MMM').format(dt);
-    } catch (_) {
-      return month;
-    }
-  }
-
-  double _displayValue(MonthlyDividend item, bool showKrw) {
-    final rate = widget.exchangeRate;
-    if (showKrw) {
-      return rate != null
-          ? item.totalUsd * rate + item.totalKrw
-          : item.totalKrw;
-    }
-
-    return rate != null ? item.totalUsd + item.totalKrw / rate : item.totalUsd;
-  }
-
-  String _formatValue(double value, bool showKrw) {
-    if (showKrw) {
-      return '₩${NumberFormat('#,###').format(value.round())}';
-    }
-    return '\$${NumberFormat('#,##0.00').format(value)}';
-  }
+  const _MiniStat({required this.label, required this.value, this.badge});
 
   @override
   Widget build(BuildContext context) {
-    final showKrw = ref.watch(homeCurrencyProvider);
-    final data = _recent;
-    if (data.isEmpty) return const SizedBox.shrink();
-
-    final maxVal = data
-        .map((e) => _displayValue(e, showKrw))
-        .reduce((a, b) => a > b ? a : b);
-    final touched = _touchedIndex >= 0 && _touchedIndex < data.length
-        ? data[_touchedIndex]
-        : null;
-    final touchedValue = touched == null
-        ? null
-        : _formatValue(_displayValue(touched, showKrw), showKrw);
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
+    final p = context.pal;
+    return InsetPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            height: 20,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    label,
+                    style: AppText.label(p),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                ?badge,
+              ],
+            ),
+          ),
+          const SizedBox(height: 4),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(value, style: AppText.num(p, size: 16)),
+          ),
+        ],
       ),
+    );
+  }
+}
+
+String _monthKey(DateTime d) =>
+    '${d.year}-${d.month.toString().padLeft(2, '0')}';
+
+/// 월별 배당 요약 (이번 달 · 월평균 · 지난달 · 최고 달). 금액은 원화 환산
+class _MonthlyInsights {
+  final double? thisMonthKrw;
+  final double? lastMonthKrw;
+  final String? lastMonthLabel;
+  final double averageKrw;
+  final double bestKrw;
+  final String bestLabel;
+  final double? momPct;
+
+  const _MonthlyInsights({
+    required this.thisMonthKrw,
+    required this.lastMonthKrw,
+    required this.lastMonthLabel,
+    required this.averageKrw,
+    required this.bestKrw,
+    required this.bestLabel,
+    required this.momPct,
+  });
+
+  static _MonthlyInsights? from(List<MonthlyDividend> monthly, double rate) {
+    if (monthly.isEmpty) return null;
+    double krw(MonthlyDividend m) => m.totalUsd * rate + m.totalKrw;
+    final byMonth = {for (final m in monthly) m.month: krw(m)};
+    final now = DateTime.now();
+    final last = DateTime(now.year, now.month - 1);
+    final thisMonth = byMonth[_monthKey(now)];
+    final lastMonth = byMonth[_monthKey(last)];
+    final best = monthly.reduce((a, b) => krw(a) >= krw(b) ? a : b);
+    final average = byMonth.values.reduce((a, b) => a + b) / byMonth.length;
+    String yyMM(String key) =>
+        key.length >= 7 ? '${key.substring(2, 4)}.${key.substring(5, 7)}' : key;
+
+    return _MonthlyInsights(
+      thisMonthKrw: thisMonth,
+      lastMonthKrw: lastMonth,
+      lastMonthLabel: '${last.month}월',
+      averageKrw: average,
+      bestKrw: krw(best),
+      bestLabel: yyMM(best.month),
+      momPct: thisMonth != null && lastMonth != null && lastMonth > 0
+          ? (thisMonth - lastMonth) / lastMonth * 100
+          : null,
+    );
+  }
+}
+
+// ── 월별 배당 차트 ──────────────────────────────────────
+class _MonthlyChartCard extends ConsumerStatefulWidget {
+  final List<MonthlyDividend> monthly;
+  final double? rate;
+
+  const _MonthlyChartCard({required this.monthly, required this.rate});
+
+  @override
+  ConsumerState<_MonthlyChartCard> createState() => _MonthlyChartCardState();
+}
+
+class _MonthlyChartCardState extends ConsumerState<_MonthlyChartCard> {
+  int _touched = -1;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pal;
+    final showKrw = ref.watch(homeCurrencyProvider);
+    final rate = widget.rate ?? fallbackUsdKrw;
+    if (widget.monthly.isEmpty) return const SizedBox.shrink();
+
+    // 이번 달까지 최근 12개월 (배당이 없는 달은 0)
+    final byMonth = {
+      for (final m in widget.monthly) m.month: m.totalUsd * rate + m.totalKrw,
+    };
+    final now = DateTime.now();
+    final months = [
+      for (var i = 11; i >= 0; i--) DateTime(now.year, now.month - i),
+    ];
+    final values = [for (final m in months) byMonth[_monthKey(m)] ?? 0.0];
+    final maxV = values.fold<double>(0, (a, b) => b > a ? b : a);
+    // 위 카드의 '월평균'과 같은 값 (배당이 있는 달의 평균)
+    final avg = byMonth.values.reduce((a, b) => a + b) / byMonth.length;
+    double shown(double krw) => showKrw ? krw : krw / rate;
+    String label(double krw) => showKrw ? fmtKrwShort(krw) : fmtUsd(krw / rate);
+
+    final touched = _touched >= 0 && _touched < months.length ? _touched : -1;
+
+    return GlassCard(
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Expanded(
-                child: Text(
-                  'Monthly Dividends',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  ),
+              Expanded(child: Text('월별 배당', style: AppText.sectionTitle(p))),
+              Text(
+                touched >= 0
+                    ? '${months[touched].year % 100}.${months[touched].month.toString().padLeft(2, '0')} · ${showKrw ? fmtKrw(values[touched]) : fmtUsd(values[touched] / rate)}'
+                    : '최근 12개월',
+                style: AppText.label(
+                  p,
+                  color: touched >= 0 ? p.mint.s300 : null,
                 ),
               ),
-              if (touched != null)
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
-                  child: Text(
-                    key: ValueKey(touched.month),
-                    touchedValue!,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 18),
           SizedBox(
             height: 150,
             child: BarChart(
               BarChartData(
-                maxY: maxVal * 1.3,
+                maxY: maxV <= 0 ? 1 : shown(maxV) * 1.18,
+                minY: 0,
+                alignment: BarChartAlignment.spaceBetween,
                 barTouchData: BarTouchData(
                   touchTooltipData: BarTouchTooltipData(
                     getTooltipColor: (_) => Colors.transparent,
                     tooltipPadding: EdgeInsets.zero,
-                    getTooltipItem: (_, p1, _, p2) => null,
+                    getTooltipItem: (_, _, _, _) => null,
                   ),
                   touchCallback: (event, response) {
-                    if (response?.spot != null &&
-                        event is! FlTapUpEvent &&
-                        event is! FlPanEndEvent) {
-                      setState(() => _touchedIndex = response!.spot!.touchedBarGroupIndex);
-                    } else {
-                      setState(() => _touchedIndex = -1);
-                    }
+                    final spot = response?.spot;
+                    setState(() {
+                      _touched =
+                          spot != null &&
+                              event is! FlTapUpEvent &&
+                              event is! FlPanEndEvent
+                          ? spot.touchedBarGroupIndex
+                          : -1;
+                    });
                   },
                 ),
+                extraLinesData: ExtraLinesData(
+                  horizontalLines: [
+                    if (avg > 0)
+                      HorizontalLine(
+                        y: shown(avg),
+                        color: p.mint.s400.withValues(alpha: 0.45),
+                        strokeWidth: 1,
+                        dashArray: [4, 4],
+                        label: HorizontalLineLabel(
+                          show: true,
+                          alignment: Alignment.topLeft,
+                          padding: const EdgeInsets.only(bottom: 3),
+                          style: AppText.label(
+                            p,
+                            size: 10,
+                            color: p.mint.s300.withValues(alpha: 0.85),
+                          ),
+                          labelResolver: (_) => '월평균 ${label(avg)}',
+                        ),
+                      ),
+                  ],
+                ),
                 titlesData: FlTitlesData(
-                  leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  leftTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
                   bottomTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
-                      reservedSize: 28,
+                      reservedSize: 24,
                       getTitlesWidget: (value, meta) {
                         final i = value.toInt();
-                        if (i < 0 || i >= data.length) return const SizedBox.shrink();
-                        final isTouched = i == _touchedIndex;
+                        if (i < 0 || i >= months.length) {
+                          return const SizedBox.shrink();
+                        }
+                        final current = i == months.length - 1;
                         return Padding(
-                          padding: const EdgeInsets.only(top: 6),
+                          padding: const EdgeInsets.only(top: 8),
                           child: Text(
-                            _shortMonth(data[i].month),
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: isTouched ? FontWeight.w700 : FontWeight.w400,
-                              color: isTouched ? AppColors.primary : AppColors.textSecondary,
+                            '${months[i].month}',
+                            style: AppText.label(
+                              p,
+                              size: 10,
+                              color: i == touched || current
+                                  ? p.mint.s300
+                                  : p.zinc.s500,
                             ),
                           ),
                         );
@@ -264,29 +669,28 @@ class _MonthlyChartState extends ConsumerState<_MonthlyChart> {
                     ),
                   ),
                 ),
-                gridData: FlGridData(
-                  show: true,
-                  drawVerticalLine: false,
-                  getDrawingHorizontalLine: (_) => const FlLine(
-                    color: AppColors.border,
-                    strokeWidth: 1,
-                  ),
-                ),
+                gridData: const FlGridData(show: false),
                 borderData: FlBorderData(show: false),
-                barGroups: data.asMap().entries.map((e) {
-                  final isTouched = e.key == _touchedIndex;
-                  return BarChartGroupData(
-                    x: e.key,
-                    barRods: [
-                      BarChartRodData(
-                        toY: _displayValue(e.value, showKrw),
-                        color: isTouched ? AppColors.primary : AppColors.primary.withValues(alpha: 0.3),
-                        width: 14,
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
-                      ),
-                    ],
-                  );
-                }).toList(),
+                barGroups: [
+                  for (var i = 0; i < months.length; i++)
+                    BarChartGroupData(
+                      x: i,
+                      barRods: [
+                        BarChartRodData(
+                          toY: shown(values[i]),
+                          width: 16,
+                          color: i == touched
+                              ? p.mint.s300
+                              : i == months.length - 1
+                              ? p.mint.s400
+                              : p.w(0.12),
+                          borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(5),
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
               ),
               duration: const Duration(milliseconds: 150),
             ),
@@ -297,642 +701,174 @@ class _MonthlyChartState extends ConsumerState<_MonthlyChart> {
   }
 }
 
-// ── 기존 위젯들 ───────────────────────────────────────
-class _TotalDividendCard extends ConsumerWidget {
-  final DividendStats stats;
-  final double? exchangeRate;
+// ── 최근 배당 ──────────────────────────────────────────
+class _RecentDividendsCard extends StatelessWidget {
+  final List<Dividend> dividends;
+  final VoidCallback? onViewAll;
 
-  const _TotalDividendCard({required this.stats, required this.exchangeRate});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final showKrw = ref.watch(homeCurrencyProvider);
-
-    final rate = exchangeRate;
-    final krwToUsd = rate != null && rate > 0 ? stats.totalDividendsKrw / rate : 0.0;
-    final combinedUsd = stats.totalDividendsUsd + krwToUsd;
-    final combinedKrw = rate != null
-        ? stats.totalDividendsUsd * rate + stats.totalDividendsKrw
-        : stats.totalDividendsKrw;
-
-    final usdFmt = NumberFormat('#,##0.00');
-    final krwFmt = NumberFormat('#,###');
-
-    final mainLabel = showKrw
-        ? '₩${krwFmt.format(combinedKrw.round())}'
-        : '\$${usdFmt.format(combinedUsd)}';
-    final subLabel = showKrw
-        ? '\$${usdFmt.format(combinedUsd)}'
-        : '₩${krwFmt.format(combinedKrw.round())}';
-
-    return GestureDetector(
-      onTap: () => ref.read(homeCurrencyProvider.notifier).state = !showKrw,
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Total Dividends',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: AppColors.textSecondary,
-                          )),
-                      const SizedBox(height: 6),
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 250),
-                        transitionBuilder: (child, anim) => FadeTransition(
-                          opacity: anim,
-                          child: SlideTransition(
-                            position: Tween<Offset>(
-                              begin: const Offset(0, 0.15),
-                              end: Offset.zero,
-                            ).animate(anim),
-                            child: child,
-                          ),
-                        ),
-                        child: Text(
-                          mainLabel,
-                          key: ValueKey(mainLabel),
-                          style: const TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryDim,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Center(
-                    child: showKrw
-                        ? const Text(
-                            '₩',
-                            style: TextStyle(
-                              color: AppColors.primary,
-                              fontSize: 30,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          )
-                        : const Icon(
-                            Icons.attach_money_rounded,
-                            color: AppColors.primary,
-                            size: 28,
-                          ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Container(height: 1, color: AppColors.border),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        subLabel,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          _CurrencyChip(
-                            label: '\$${usdFmt.format(stats.totalDividendsUsd)}',
-                            color: AppColors.primary,
-                            bg: AppColors.primaryDim,
-                          ),
-                          const SizedBox(width: 6),
-                          _CurrencyChip(
-                            label: '₩${krwFmt.format(stats.totalDividendsKrw)}',
-                            color: AppColors.positive,
-                            bg: Color(0x3322C55E),
-                          ),
-                        ],
-                      ),
-                      if (rate != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(
-                            '환율 ${krwFmt.format(rate)} KRW/USD 기준  •  탭하여 전환',
-                            style: const TextStyle(
-                              fontSize: 10,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _CurrencyChip extends StatelessWidget {
-  final String label;
-  final Color color;
-  final Color bg;
-  const _CurrencyChip({required this.label, required this.color, required this.bg});
+  const _RecentDividendsCard({required this.dividends, this.onViewAll});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color),
-      ),
-    );
-  }
-}
-
-// ── 월별 인사이트 2×2 그리드 ──────────────────────────────
-class _MonthlyInsights extends ConsumerWidget {
-  final List<MonthlyDividend> monthly;
-  final double? exchangeRate;
-
-  const _MonthlyInsights({required this.monthly, this.exchangeRate});
-
-  double _combined(MonthlyDividend m, double? rate) {
-    if (rate == null || rate == 0) return m.totalUsd;
-    return m.totalUsd + m.totalKrw / rate;
-  }
-
-  String _fmt(double v, bool showKrw, double? rate) {
-    if (showKrw) {
-      final krw = v * (rate ?? 1300);
-      return '₩${NumberFormat('#,###').format(krw.round())}';
-    }
-    return '\$${NumberFormat('#,##0.00').format(v)}';
-  }
-
-  String _shortMonth(String label) {
-    try {
-      final dt = DateTime.parse('$label-01');
-      return DateFormat('yy년도 M월').format(dt);
-    } catch (_) {
-      return label;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    if (monthly.isEmpty) return const SizedBox.shrink();
-
-    final showKrw = ref.watch(homeCurrencyProvider);
-    final sorted = [...monthly]..sort((a, b) => a.month.compareTo(b.month));
-    final now = DateTime.now();
-    final thisMonthKey = '${now.year}-${now.month.toString().padLeft(2, '0')}';
-    final lastMonthDt = DateTime(now.year, now.month - 1);
-    final lastMonthKey = '${lastMonthDt.year}-${lastMonthDt.month.toString().padLeft(2, '0')}';
-
-    final thisMonth = sorted.where((m) => m.month == thisMonthKey).firstOrNull;
-    final lastMonth = sorted.where((m) => m.month == lastMonthKey).firstOrNull;
-    final best = sorted.reduce((a, b) => _combined(a, exchangeRate) > _combined(b, exchangeRate) ? a : b);
-
-    final avg = sorted.isEmpty
-        ? 0.0
-        : sorted.map((m) => _combined(m, exchangeRate)).reduce((a, b) => a + b) / sorted.length;
-
-    double? momPct;
-    if (thisMonth != null && lastMonth != null && _combined(lastMonth, exchangeRate) > 0) {
-      momPct = (_combined(thisMonth, exchangeRate) - _combined(lastMonth, exchangeRate)) /
-          _combined(lastMonth, exchangeRate) * 100;
-    }
-
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: _InsightCard(
-                icon: Icons.today_rounded,
-                iconColor: AppColors.primary,
-                iconBg: AppColors.primaryDim,
-                label: '이번 달',
-                value: thisMonth != null ? _fmt(_combined(thisMonth, exchangeRate), showKrw, exchangeRate) : '-',
-                badge: momPct != null ? _MomBadge(pct: momPct) : null,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _InsightCard(
-                icon: Icons.show_chart_rounded,
-                iconColor: AppColors.secondary,
-                iconBg: AppColors.secondaryDim,
-                label: '월 평균',
-                value: _fmt(avg, showKrw, exchangeRate),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(
-              child: _InsightCard(
-                icon: Icons.history_rounded,
-                iconColor: const Color(0xFFFF9500),
-                iconBg: Color(0x33FF9500),
-                label: '전월',
-                value: lastMonth != null ? _fmt(_combined(lastMonth, exchangeRate), showKrw, exchangeRate) : '-',
-                sub: lastMonth != null ? _shortMonth(lastMonth.month) : null,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _InsightCard(
-                icon: Icons.emoji_events_rounded,
-                iconColor: AppColors.positive,
-                iconBg: Color(0x3322C55E),
-                label: '최고 달',
-                value: _fmt(_combined(best, exchangeRate), showKrw, exchangeRate),
-                sub: _shortMonth(best.month),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _InsightCard extends StatelessWidget {
-  final IconData icon;
-  final Color iconColor;
-  final Color iconBg;
-  final String label;
-  final String value;
-  final String? sub;
-  final Widget? badge;
-
-  const _InsightCard({
-    required this.icon,
-    required this.iconColor,
-    required this.iconBg,
-    required this.label,
-    required this.value,
-    this.sub,
-    this.badge,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-      ),
+    final p = context.pal;
+    final items = dividends.take(4).toList();
+    return GlassCard(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(7),
-                decoration: BoxDecoration(
-                  color: iconBg,
-                  borderRadius: BorderRadius.circular(9),
-                ),
-                child: Icon(icon, color: iconColor, size: 16),
-              ),
-              const Spacer(),
-              ?badge,
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Row(
-            children: [
-              Text(
-                label,
-                style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
-              ),
-              if (sub != null) ...[
-                const SizedBox(width: 4),
-                Text(
-                  '· $sub',
-                  style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
-                ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 16, 8),
+            child: Row(
+              children: [
+                Expanded(child: Text('최근 배당', style: AppText.sectionTitle(p))),
+                TextLink(label: '전체 보기', onTap: onViewAll),
               ],
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MomBadge extends StatelessWidget {
-  final double pct;
-  const _MomBadge({required this.pct});
-
-  @override
-  Widget build(BuildContext context) {
-    final isUp = pct >= 0;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: isUp ? const Color(0x3322C55E) : const Color(0x33EF4444),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            isUp ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
-            size: 10,
-            color: isUp ? AppColors.positive : AppColors.negative,
-          ),
-          Text(
-            '${pct.abs().toStringAsFixed(1)}%',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              color: isUp ? AppColors.positive : AppColors.negative,
             ),
           ),
+          if (items.isEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+              child: Text(
+                '배당금 내역이 없습니다',
+                style: AppText.body(p, color: p.zinc.s500),
+              ),
+            ),
+          for (final d in items) ...[
+            const RowDivider(),
+            _RecentRow(dividend: d),
+          ],
         ],
       ),
     );
   }
 }
 
-class _InsightGridSkeleton extends StatelessWidget {
-  const _InsightGridSkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Row(children: [
-          Expanded(child: Container(height: 90, decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(16)))),
-          const SizedBox(width: 10),
-          Expanded(child: Container(height: 90, decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(16)))),
-        ]),
-        const SizedBox(height: 10),
-        Row(children: [
-          Expanded(child: Container(height: 90, decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(16)))),
-          const SizedBox(width: 10),
-          Expanded(child: Container(height: 90, decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(16)))),
-        ]),
-      ],
-    );
-  }
-}
-
-class _ActivityItem extends StatelessWidget {
+class _RecentRow extends StatelessWidget {
   final Dividend dividend;
 
-  const _ActivityItem({required this.dividend});
-
-  bool get _isKrw => dividend.currency == 'KRW';
+  const _RecentRow({required this.dividend});
 
   @override
   Widget build(BuildContext context) {
-    final name = dividend.assetName ?? 'Unknown';
-    final ticker = dividend.ticker ?? '';
-    final date = _formatDate(dividend.date);
-    final amount = _isKrw
-        ? '₩${NumberFormat('#,###').format(dividend.amount)}'
-        : '+\$${NumberFormat('#,##0.00').format(dividend.amount)}';
-    final broker = dividend.accountBroker ?? '';
-    final accName = dividend.accountName ?? '';
-    final accountLabel = broker.isNotEmpty && accName.isNotEmpty
-        ? '$broker · $accName'
-        : broker.isNotEmpty
-            ? broker
-            : accName;
+    final p = context.pal;
+    final d = dividend;
+    final account = [
+      if ((d.accountBroker ?? '').trim().isNotEmpty) d.accountBroker!.trim(),
+      if ((d.accountName ?? '').trim().isNotEmpty) d.accountName!.trim(),
+    ].join(' · ');
+    final parsed = DateTime.tryParse(d.date);
+    final date = parsed == null
+        ? d.date
+        : '${parsed.month.toString().padLeft(2, '0')}.${parsed.day.toString().padLeft(2, '0')}';
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
       child: Row(
         children: [
-          _ActivityLogoBadge(dividend: dividend),
+          TickerLogo(
+            ticker: d.ticker ?? '',
+            name: d.assetName ?? '',
+            logoUrl: d.logoUrl,
+          ),
           const SizedBox(width: 12),
-          // 종목 + 계좌 정보
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  ticker.isNotEmpty ? '$name ($ticker)' : name,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                  ),
+                  d.assetName ?? d.ticker ?? '종목',
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
+                  style: AppText.body(p),
                 ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    if (accountLabel.isNotEmpty) ...[
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceHigh,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          accountLabel,
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                    ],
-                    Text(
-                      date,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
+                const SizedBox(height: 2),
+                Text(
+                  account.isEmpty ? date : '$account · $date',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.label(p),
                 ),
               ],
             ),
           ),
           const SizedBox(width: 8),
-          // 금액
           Text(
-            amount,
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: AppColors.positive,
-            ),
+            fmtSignedMoney(d.amount, d.currency),
+            style: AppText.num(p, color: p.mint.s300),
           ),
         ],
       ),
     );
   }
-
-  String _formatDate(String date) {
-    try {
-      final dt = DateTime.parse(date);
-      return DateFormat('MMM dd, yyyy').format(dt);
-    } catch (_) {
-      return date;
-    }
-  }
 }
 
-class _ActivityLogoBadge extends StatelessWidget {
-  final Dividend dividend;
+// ── 공통 조각 ──────────────────────────────────────────
+class _Dot extends StatelessWidget {
+  final Color color;
 
-  const _ActivityLogoBadge({required this.dividend});
-
-  String? get _logoUrl {
-    final stored = dividend.logoUrl?.trim() ?? '';
-    if (stored.isNotEmpty) return stored;
-
-    final ticker = dividend.ticker?.trim().toUpperCase() ?? '';
-    if (ticker.isEmpty) return null;
-
-    return 'https://financialmodelingprep.com/image-stock/${Uri.encodeComponent(ticker)}.png';
-  }
-
-  String get _fallbackText {
-    final source = dividend.ticker?.trim().isNotEmpty == true
-        ? dividend.ticker!.trim()
-        : (dividend.assetName ?? '').trim();
-    final cleaned = source.replaceAll(RegExp(r'[^A-Za-z0-9가-힣]'), '');
-    if (cleaned.isEmpty) return '?';
-
-    return String.fromCharCodes(cleaned.runes.take(2)).toUpperCase();
-  }
-
-  Widget _fallback() {
-    return Center(
-      child: Text(
-        _fallbackText,
-        style: const TextStyle(
-          color: Color(0xFFD1D5DB),
-          fontSize: 11,
-          fontWeight: FontWeight.w800,
-          letterSpacing: -0.4,
-        ),
-      ),
-    );
-  }
+  const _Dot({required this.color});
 
   @override
-  Widget build(BuildContext context) {
-    final logoUrl = _logoUrl;
-
-    return Container(
-      width: 44,
-      height: 44,
-      decoration: BoxDecoration(
-        color: const Color(0x332E3340),
-        borderRadius: BorderRadius.circular(13),
-      ),
-      child: Center(
-        child: Container(
-          width: 30,
-          height: 30,
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            color: const Color(0xFF2B2F3A),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFF3B4150), width: 1),
-          ),
-          child: logoUrl == null
-              ? _fallback()
-              : Image.network(
-                  logoUrl,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, _, _) => _fallback(),
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return _fallback();
-                  },
-                ),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Container(
+    width: 6,
+    height: 6,
+    decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+  );
 }
 
-class _EmptyActivity extends StatelessWidget {
-  const _EmptyActivity();
+/// 불러오는 동안 자리 표시
+class _Bar extends StatelessWidget {
+  final double? width;
+  final double height;
+
+  const _Bar({this.width, required this.height});
 
   @override
-  Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(vertical: 32),
-      child: Center(
-        child: Text(
-          '배당금 내역이 없습니다',
-          style: TextStyle(color: AppColors.textSecondary),
+  Widget build(BuildContext context) => Container(
+    width: width,
+    height: height,
+    decoration: BoxDecoration(
+      color: context.pal.w(0.07),
+      borderRadius: BorderRadius.circular(8),
+    ),
+  );
+}
+
+class _SkeletonCard extends StatelessWidget {
+  final double height;
+
+  const _SkeletonCard({required this.height});
+
+  @override
+  Widget build(BuildContext context) => GlassCard(
+    child: SizedBox(
+      height: height,
+      child: const Padding(
+        padding: EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _Bar(width: 120, height: 14),
+            SizedBox(height: 16),
+            _Bar(width: 200, height: 28),
+          ],
         ),
       ),
-    );
-  }
+    ),
+  );
 }
 
 class _ErrorCard extends StatelessWidget {
   final String message;
+
   const _ErrorCard({required this.message});
 
-  String _toDisplayMessage(String raw) {
+  static String display(String raw) {
     final lower = raw.toLowerCase();
     if (lower.contains('api_key') || lower.contains('401')) {
       return '인증 실패(401)\nAPI_KEY를 확인하고 --dart-define-from-file=.env.json 옵션으로 다시 실행해 주세요.';
     }
-    if (lower.contains('timeout')) {
-      return '요청 시간이 초과되었습니다. 네트워크 상태를 확인해 주세요.';
-    }
+    if (lower.contains('timeout')) return '요청 시간이 초과되었습니다. 네트워크 상태를 확인해 주세요.';
     if (lower.contains('socketexception') || lower.contains('connection')) {
       return '네트워크 연결 오류가 발생했습니다.';
     }
@@ -941,148 +877,17 @@ class _ErrorCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final display = _toDisplayMessage(message);
+    final p = context.pal;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.negative.withValues(alpha: 0.3)),
+        color: p.rose.s500.withValues(alpha: 0.08),
+        border: Border.all(color: p.rose.s400.withValues(alpha: 0.3)),
       ),
-      child: Text('서버 연결 실패\n$display',
-          style: const TextStyle(color: AppColors.negative, fontSize: 12)),
-    );
-  }
-}
-
-class _StatCardSkeleton extends StatelessWidget {
-  const _StatCardSkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 140,
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: const Center(child: CircularProgressIndicator()),
-    );
-  }
-}
-
-class _ChartSkeleton extends StatelessWidget {
-  const _ChartSkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 200,
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: const Center(child: CircularProgressIndicator()),
-    );
-  }
-}
-
-// Shimmer 애니메이션 베이스
-class _Shimmer extends StatefulWidget {
-  final Widget child;
-  const _Shimmer({required this.child});
-
-  @override
-  State<_Shimmer> createState() => _ShimmerState();
-}
-
-class _ShimmerState extends State<_Shimmer> with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _anim;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))
-      ..repeat();
-    _anim = Tween<double>(begin: -1.5, end: 1.5).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _anim,
-      builder: (_, _) => ShaderMask(
-        blendMode: BlendMode.srcATop,
-        shaderCallback: (bounds) => LinearGradient(
-          begin: Alignment(_anim.value - 1, 0),
-          end: Alignment(_anim.value + 1, 0),
-          colors: const [
-            Color(0xFF161625),
-            Color(0xFF1E1E30),
-            Color(0xFF161625),
-          ],
-          stops: const [0.0, 0.5, 1.0],
-        ).createShader(bounds),
-        child: widget.child,
-      ),
-    );
-  }
-}
-
-class _ActivitySkeleton extends StatelessWidget {
-  const _ActivitySkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    return _Shimmer(
-      child: Column(
-        children: List.generate(3, (_) => _SkeletonCard()),
-      ),
-    );
-  }
-}
-
-class _SkeletonCard extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 44, height: 44,
-            decoration: BoxDecoration(
-              color: AppColors.surfaceHigh,
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(height: 13, width: 140, decoration: BoxDecoration(color: AppColors.surfaceHigh, borderRadius: BorderRadius.circular(4))),
-                const SizedBox(height: 8),
-                Container(height: 10, width: 90, decoration: BoxDecoration(color: AppColors.surfaceHigh, borderRadius: BorderRadius.circular(4))),
-              ],
-            ),
-          ),
-          Container(height: 14, width: 60, decoration: BoxDecoration(color: AppColors.surfaceHigh, borderRadius: BorderRadius.circular(4))),
-        ],
+      child: Text(
+        '서버 연결 실패\n${display(message)}',
+        style: AppText.body(p, size: 12.5, color: p.rose.s200),
       ),
     );
   }

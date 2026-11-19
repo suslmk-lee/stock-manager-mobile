@@ -39,6 +39,7 @@ dependencies:
   fl_chart: ^0.70.2
   shared_preferences: ^2.3.3
   flutter_slidable: ^3.1.2
+  flutter_svg: ^2.3.4
 
 dev_dependencies:
   flutter_test:
@@ -62,6 +63,26 @@ flutter:
   uses-material-design: true
   assets:
     - assets/brokers/
+    - assets/branding/brand_mark.png
+    - assets/fonts/OFL-Pretendard.txt
+    - assets/fonts/OFL-JetBrainsMono.txt
+
+  # 데스크톱 앱과 같은 글꼴 (본문 Pretendard, 숫자·라벨 JetBrains Mono)
+  fonts:
+    - family: Pretendard
+      fonts:
+        - asset: assets/fonts/Pretendard-Light.otf
+          weight: 300
+        - asset: assets/fonts/Pretendard-Regular.otf
+          weight: 400
+        - asset: assets/fonts/Pretendard-Medium.otf
+          weight: 500
+        - asset: assets/fonts/Pretendard-SemiBold.otf
+          weight: 600
+    - family: JetBrainsMono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono-Regular.ttf
+          weight: 400
 
   # To add assets to your application, add an assets section, like this:
   # assets:
