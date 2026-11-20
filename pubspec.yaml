@@ -115,21 +115,24 @@ flutter:
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
 
+# 앱 아이콘·스플래시는 데스크톱 브랜드 마크 (원본 SVG: assets/branding/source, PNG 는 tool/render_icons.sh)
 flutter_launcher_icons:
   android: true
   ios: true
   image_path: assets/branding/app_icon.png
-  adaptive_icon_background: "#090E21"
-  adaptive_icon_foreground: assets/branding/splash_logo.png
+  image_path_ios: assets/branding/app_icon_ios.png
+  adaptive_icon_background: assets/branding/app_icon_bg.png
+  adaptive_icon_foreground: assets/branding/app_icon_fg.png
+  adaptive_icon_monochrome: assets/branding/app_icon_mono.png
   min_sdk_android: 21
   remove_alpha_ios: true
 
 flutter_native_splash:
-  color: "#090E21"
+  color: "#060607"
   image: assets/branding/splash_logo.png
   android: true
   ios: true
   web: false
   android_12:
-    color: "#090E21"
+    color: "#060607"
     image: assets/branding/splash_logo.png
