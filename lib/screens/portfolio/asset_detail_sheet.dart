@@ -32,18 +32,18 @@ class AssetDetailSheet extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title: const Text(
+        backgroundColor: context.colors.surface,
+        title: Text(
           '자산 삭제',
           style: TextStyle(
-            color: AppColors.textPrimary,
+            color: context.colors.textPrimary,
             fontWeight: FontWeight.w700,
           ),
         ),
         content: Text(
           "'${asset.name}' 자산을 삭제하시겠습니까?\n\n보유 내역, 거래 기록, 배당 기록이 있는 경우 삭제할 수 없습니다.",
-          style: const TextStyle(
-            color: AppColors.textSecondary,
+          style: TextStyle(
+            color: context.colors.textSecondary,
             fontSize: 14,
             height: 1.5,
           ),
@@ -51,9 +51,9 @@ class AssetDetailSheet extends ConsumerWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text(
+            child: Text(
               '취소',
-              style: TextStyle(color: AppColors.textSecondary),
+              style: TextStyle(color: context.colors.textSecondary),
             ),
           ),
           FilledButton(
@@ -76,7 +76,7 @@ class AssetDetailSheet extends ConsumerWidget {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(msg),
-                      backgroundColor: AppColors.negative,
+                      backgroundColor: context.colors.negative,
                     ),
                   );
                 }
@@ -85,14 +85,14 @@ class AssetDetailSheet extends ConsumerWidget {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('삭제 실패: $e'),
-                      backgroundColor: AppColors.negative,
+                      backgroundColor: context.colors.negative,
                     ),
                   );
                 }
               }
             },
             style: FilledButton.styleFrom(
-              backgroundColor: AppColors.negative,
+              backgroundColor: context.colors.negative,
             ),
             child: const Text('삭제'),
           ),
@@ -111,8 +111,8 @@ class AssetDetailSheet extends ConsumerWidget {
       minChildSize: 0.4,
       maxChildSize: 0.95,
       builder: (_, controller) => Container(
-        decoration: const BoxDecoration(
-          color: AppColors.white,
+        decoration: BoxDecoration(
+          color: context.colors.surface,
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: Column(
@@ -123,7 +123,7 @@ class AssetDetailSheet extends ConsumerWidget {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: AppColors.cardBorder,
+                color: context.colors.border,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -136,7 +136,7 @@ class AssetDetailSheet extends ConsumerWidget {
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: AppColors.primaryLight,
+                      color: context.colors.primaryDim,
                       borderRadius: BorderRadius.circular(24),
                     ),
                     child: Center(
@@ -144,8 +144,8 @@ class AssetDetailSheet extends ConsumerWidget {
                         _isKorean
                             ? asset.name.substring(0, asset.name.length > 3 ? 3 : asset.name.length)
                             : (asset.ticker.length > 4 ? asset.ticker.substring(0, 4) : asset.ticker),
-                        style: const TextStyle(
-                          color: AppColors.primary,
+                        style: TextStyle(
+                          color: context.colors.primary,
                           fontWeight: FontWeight.w700,
                           fontSize: 12,
                         ),
@@ -159,17 +159,17 @@ class AssetDetailSheet extends ConsumerWidget {
                       children: [
                         Text(
                           _isKorean ? asset.name : asset.ticker,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w800,
-                            color: AppColors.textPrimary,
+                            color: context.colors.textPrimary,
                           ),
                         ),
                         Text(
                           _isKorean ? asset.ticker : asset.name,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13,
-                            color: AppColors.textSecondary,
+                            color: context.colors.textSecondary,
                           ),
                         ),
                       ],
@@ -190,10 +190,10 @@ class AssetDetailSheet extends ConsumerWidget {
                             children: [
                               Text(
                                 formatCurrency(price.price, price.currency),
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w700,
-                                  color: AppColors.textPrimary,
+                                  color: context.colors.textPrimary,
                                 ),
                               ),
                               Text(
@@ -201,8 +201,8 @@ class AssetDetailSheet extends ConsumerWidget {
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: price.changePercent >= 0
-                                      ? AppColors.positive
-                                      : Colors.red,
+                                      ? context.colors.positive
+                                      : context.colors.negative,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -211,8 +211,8 @@ class AssetDetailSheet extends ConsumerWidget {
                   ),
                   const SizedBox(width: 4),
                   IconButton(
-                    icon: const Icon(Icons.delete_outline,
-                        color: AppColors.negative, size: 22),
+                    icon: Icon(Icons.delete_outline,
+                        color: context.colors.negative, size: 22),
                     tooltip: '자산 삭제',
                     onPressed: () =>
                         _showDeleteConfirmDialog(context, ref),
@@ -220,7 +220,7 @@ class AssetDetailSheet extends ConsumerWidget {
                 ],
               ),
             ),
-            const Divider(height: 1, color: AppColors.cardBorder),
+            Divider(height: 1, color: context.colors.border),
             // 보유 현황 목록
             Expanded(
               child: accountsAsync.when(
@@ -232,12 +232,12 @@ class AssetDetailSheet extends ConsumerWidget {
                     controller: controller,
                     padding: const EdgeInsets.all(16),
                     children: [
-                      const Text(
+                      Text(
                         '계좌별 보유 현황',
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.textSecondary,
+                          color: context.colors.textSecondary,
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -296,9 +296,9 @@ class _HoldingRow extends ConsumerWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.background,
+        color: context.colors.background,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.cardBorder),
+        border: Border.all(color: context.colors.border),
       ),
       child: Row(
         children: [
@@ -308,26 +308,26 @@ class _HoldingRow extends ConsumerWidget {
               children: [
                 Text(
                   accountName,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+                    color: context.colors.textPrimary,
                   ),
                 ),
                 if (broker.isNotEmpty)
                   Text(
                     broker,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: AppColors.textSecondary,
+                      color: context.colors.textSecondary,
                     ),
                   ),
                 const SizedBox(height: 4),
                 Text(
                   '${NumberFormat('#,##0.####').format(holding.quantity)}주',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
-                    color: AppColors.textSecondary,
+                    color: context.colors.textSecondary,
                   ),
                 ),
               ],
@@ -346,17 +346,17 @@ class _HoldingRow extends ConsumerWidget {
                     padding: const EdgeInsets.only(right: 4),
                     child: Text(
                       _formatValue(holding.quantity * price.price, price.currency),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
+                        color: context.colors.textPrimary,
                       ),
                     ),
                   ),
           ),
           IconButton(
-            icon: const Icon(Icons.edit_outlined,
-                color: AppColors.primary, size: 20),
+            icon: Icon(Icons.edit_outlined,
+                color: context.colors.primary, size: 20),
             onPressed: () => _showEditDialog(context, ref),
           ),
         ],
@@ -424,7 +424,7 @@ class _HoldingRow extends ConsumerWidget {
                 }
               }
             },
-            style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+            style: FilledButton.styleFrom(backgroundColor: context.colors.primary),
             child: const Text('저장'),
           ),
         ],

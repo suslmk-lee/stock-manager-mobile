@@ -117,10 +117,10 @@ class _AddDividendSheetState extends ConsumerState<_AddDividendSheet> {
       lastDate: DateTime.now(),
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
-          colorScheme: const ColorScheme.dark(
-            primary: AppColors.primary,
-            surface: AppColors.surface,
-            onSurface: AppColors.textPrimary,
+          colorScheme: ColorScheme.dark(
+            primary: context.colors.primary,
+            surface: context.colors.surface,
+            onSurface: context.colors.textPrimary,
           ),
         ),
         child: child!,
@@ -165,7 +165,7 @@ class _AddDividendSheetState extends ConsumerState<_AddDividendSheet> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(_isEditing ? '수정 실패: $e' : '저장 실패: $e'),
-            backgroundColor: AppColors.negative,
+            backgroundColor: context.colors.negative,
           ),
         );
       }
@@ -191,8 +191,8 @@ class _AddDividendSheetState extends ConsumerState<_AddDividendSheet> {
       maxChildSize: 0.95,
       minChildSize: 0.5,
       builder: (_, controller) => Container(
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
+        decoration: BoxDecoration(
+          color: context.colors.surface,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: ListView(
@@ -205,17 +205,17 @@ class _AddDividendSheetState extends ConsumerState<_AddDividendSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: AppColors.border,
+                  color: context.colors.border,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
             Text(
               _isEditing ? '배당금 수정' : '배당금 추가',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w800,
-                color: AppColors.textPrimary,
+                color: context.colors.textPrimary,
               ),
             ),
             const SizedBox(height: 24),
@@ -275,42 +275,42 @@ class _AddDividendSheetState extends ConsumerState<_AddDividendSheet> {
                       controller: _assetSearchCtrl,
                       enabled: currentAccount != null,
                       style:
-                          const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+                          TextStyle(color: context.colors.textPrimary, fontSize: 14),
                       onChanged: (_) => setState(() {}),
                       decoration: InputDecoration(
                         hintText: currentAccount == null
                             ? '계좌를 먼저 선택하세요'
                             : '티커 또는 종목명 검색...',
-                        hintStyle: const TextStyle(color: AppColors.textSecondary),
+                        hintStyle: TextStyle(color: context.colors.textSecondary),
                         prefixIcon:
-                            const Icon(Icons.search_rounded, color: AppColors.textSecondary, size: 20),
+                            Icon(Icons.search_rounded, color: context.colors.textSecondary, size: 20),
                         suffixIcon: _assetSearchCtrl.text.isNotEmpty
                             ? IconButton(
-                                icon: const Icon(Icons.close_rounded,
-                                    color: AppColors.textSecondary, size: 18),
+                                icon: Icon(Icons.close_rounded,
+                                    color: context.colors.textSecondary, size: 18),
                                 onPressed: () => setState(() => _assetSearchCtrl.clear()),
                               )
                             : null,
                         filled: true,
-                        fillColor: AppColors.surfaceHigh,
+                        fillColor: context.colors.surfaceHigh,
                         contentPadding:
                             const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(color: AppColors.border),
+                          borderSide: BorderSide(color: context.colors.border),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(color: AppColors.border),
+                          borderSide: BorderSide(color: context.colors.border),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
                           borderSide:
-                              const BorderSide(color: AppColors.primary, width: 1.5),
+                              BorderSide(color: context.colors.primary, width: 1.5),
                         ),
                         disabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide(color: AppColors.border.withValues(alpha: 0.5)),
+                          borderSide: BorderSide(color: context.colors.border.withValues(alpha: 0.5)),
                         ),
                       ),
                     ),
@@ -318,26 +318,26 @@ class _AddDividendSheetState extends ConsumerState<_AddDividendSheet> {
                       const SizedBox(height: 4),
                       Container(
                         decoration: BoxDecoration(
-                          color: AppColors.surfaceHigh,
+                          color: context.colors.surfaceHigh,
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppColors.border),
+                          border: Border.all(color: context.colors.border),
                         ),
                         constraints: const BoxConstraints(maxHeight: 220),
                         child: filtered.isEmpty
-                            ? const Padding(
+                            ? Padding(
                                 padding: EdgeInsets.all(16),
                                 child: Text(
                                   '검색 결과 없음',
                                   style: TextStyle(
-                                      color: AppColors.textSecondary, fontSize: 13),
+                                      color: context.colors.textSecondary, fontSize: 13),
                                 ),
                               )
                             : ListView.separated(
                                 shrinkWrap: true,
                                 padding: const EdgeInsets.symmetric(vertical: 4),
                                 itemCount: filtered.length,
-                                separatorBuilder: (_, _) => const Divider(
-                                  color: AppColors.border,
+                                separatorBuilder: (_, _) => Divider(
+                                  color: context.colors.border,
                                   height: 1,
                                   indent: 14,
                                   endIndent: 14,
@@ -358,7 +358,7 @@ class _AddDividendSheetState extends ConsumerState<_AddDividendSheet> {
                                             width: 36,
                                             height: 36,
                                             decoration: BoxDecoration(
-                                              color: AppColors.primaryDim,
+                                              color: context.colors.primaryDim,
                                               borderRadius: BorderRadius.circular(10),
                                             ),
                                             child: Center(
@@ -372,8 +372,8 @@ class _AddDividendSheetState extends ConsumerState<_AddDividendSheet> {
                                                     : (asset.ticker.length > 4
                                                         ? asset.ticker.substring(0, 4)
                                                         : asset.ticker),
-                                                style: const TextStyle(
-                                                  color: AppColors.primary,
+                                                style: TextStyle(
+                                                  color: context.colors.primary,
                                                   fontWeight: FontWeight.w700,
                                                   fontSize: 10,
                                                 ),
@@ -388,17 +388,17 @@ class _AddDividendSheetState extends ConsumerState<_AddDividendSheet> {
                                               children: [
                                                 Text(
                                                   isKorean ? asset.name : asset.ticker,
-                                                  style: const TextStyle(
+                                                  style: TextStyle(
                                                     fontSize: 13,
                                                     fontWeight: FontWeight.w600,
-                                                    color: AppColors.textPrimary,
+                                                    color: context.colors.textPrimary,
                                                   ),
                                                 ),
                                                 Text(
                                                   isKorean ? asset.ticker : asset.name,
-                                                  style: const TextStyle(
+                                                  style: TextStyle(
                                                     fontSize: 11,
-                                                    color: AppColors.textSecondary,
+                                                    color: context.colors.textSecondary,
                                                   ),
                                                   overflow: TextOverflow.ellipsis,
                                                 ),
@@ -438,17 +438,17 @@ class _AddDividendSheetState extends ConsumerState<_AddDividendSheet> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 14),
                             decoration: BoxDecoration(
-                              color: selected ? AppColors.primaryDim : AppColors.surfaceHigh,
+                              color: selected ? context.colors.primaryDim : context.colors.surfaceHigh,
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(
-                                color: selected ? AppColors.primary : AppColors.border,
+                                color: selected ? context.colors.primary : context.colors.border,
                                 width: selected ? 1.5 : 1,
                               ),
                             ),
                             child: Text(
                               c,
                               style: TextStyle(
-                                color: selected ? AppColors.primary : AppColors.textSecondary,
+                                color: selected ? context.colors.primary : context.colors.textSecondary,
                                 fontWeight: FontWeight.w700,
                                 fontSize: 13,
                               ),
@@ -499,18 +499,18 @@ class _AddDividendSheetState extends ConsumerState<_AddDividendSheet> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceHigh,
+                  color: context.colors.surfaceHigh,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.border),
+                  border: Border.all(color: context.colors.border),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.calendar_today_rounded,
-                        color: AppColors.textSecondary, size: 18),
+                    Icon(Icons.calendar_today_rounded,
+                        color: context.colors.textSecondary, size: 18),
                     const SizedBox(width: 10),
                     Text(
                       DateFormat('yyyy년 MM월 dd일').format(_date),
-                      style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+                      style: TextStyle(color: context.colors.textPrimary, fontSize: 14),
                     ),
                   ],
                 ),
@@ -527,21 +527,21 @@ class _AddDividendSheetState extends ConsumerState<_AddDividendSheet> {
                     ? () => _submit(currentAccount, currentAsset)
                     : null,
                 style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: AppColors.background,
-                  disabledBackgroundColor: AppColors.border,
-                  disabledForegroundColor: AppColors.textSecondary,
+                  backgroundColor: context.colors.primary,
+                  foregroundColor: context.colors.onPrimary,
+                  disabledBackgroundColor: context.colors.border,
+                  disabledForegroundColor: context.colors.textSecondary,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
                 ),
                 child: _submitting
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 22,
                         height: 22,
                         child: CircularProgressIndicator(
                           strokeWidth: 2.5,
-                          color: AppColors.background,
+                          color: context.colors.background,
                         ),
                       )
                     : Text(
@@ -570,9 +570,9 @@ class _SelectedAssetChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: AppColors.surfaceHigh,
+        color: context.colors.surfaceHigh,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.primary, width: 1.5),
+        border: Border.all(color: context.colors.primary, width: 1.5),
       ),
       child: Row(
         children: [
@@ -580,7 +580,7 @@ class _SelectedAssetChip extends StatelessWidget {
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: AppColors.primaryDim,
+              color: context.colors.primaryDim,
               borderRadius: BorderRadius.circular(10),
             ),
             child: Center(
@@ -588,8 +588,8 @@ class _SelectedAssetChip extends StatelessWidget {
                 isKorean
                     ? asset.name.substring(0, asset.name.length > 2 ? 2 : asset.name.length)
                     : (asset.ticker.length > 4 ? asset.ticker.substring(0, 4) : asset.ticker),
-                style: const TextStyle(
-                  color: AppColors.primary,
+                style: TextStyle(
+                  color: context.colors.primary,
                   fontWeight: FontWeight.w700,
                   fontSize: 10,
                 ),
@@ -603,23 +603,23 @@ class _SelectedAssetChip extends StatelessWidget {
               children: [
                 Text(
                   isKorean ? asset.name : asset.ticker,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
+                    color: context.colors.textPrimary,
                   ),
                 ),
                 Text(
                   isKorean ? asset.ticker : asset.name,
-                  style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                  style: TextStyle(fontSize: 11, color: context.colors.textSecondary),
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.close_rounded,
-                color: AppColors.textSecondary, size: 20),
+            icon: Icon(Icons.close_rounded,
+                color: context.colors.textSecondary, size: 20),
             onPressed: onClear,
           ),
         ],
@@ -635,10 +635,10 @@ class _Label extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Text(
         text,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w600,
-          color: AppColors.textSecondary,
+          color: context.colors.textSecondary,
         ),
       );
 }
@@ -663,19 +663,19 @@ class _DarkDropdown<T> extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
-        color: AppColors.surfaceHigh,
+        color: context.colors.surfaceHigh,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: context.colors.border),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<T>(
           value: value,
           isExpanded: true,
-          dropdownColor: AppColors.surfaceHigh,
-          hint: Text(hint, style: const TextStyle(color: AppColors.textSecondary)),
-          style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
-          icon: const Icon(Icons.keyboard_arrow_down_rounded,
-              color: AppColors.textSecondary),
+          dropdownColor: context.colors.surfaceHigh,
+          hint: Text(hint, style: TextStyle(color: context.colors.textSecondary)),
+          style: TextStyle(color: context.colors.textPrimary, fontSize: 14),
+          icon: Icon(Icons.keyboard_arrow_down_rounded,
+              color: context.colors.textSecondary),
           items: items
               .map((item) => DropdownMenuItem(
                     value: item,
@@ -711,24 +711,24 @@ class _DarkTextField extends StatelessWidget {
       keyboardType: keyboardType,
       inputFormatters: inputFormatters,
       onChanged: onChanged,
-      style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+      style: TextStyle(color: context.colors.textPrimary, fontSize: 14),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: AppColors.textSecondary),
+        hintStyle: TextStyle(color: context.colors.textSecondary),
         filled: true,
-        fillColor: AppColors.surfaceHigh,
+        fillColor: context.colors.surfaceHigh,
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.border),
+          borderSide: BorderSide(color: context.colors.border),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.border),
+          borderSide: BorderSide(color: context.colors.border),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+          borderSide: BorderSide(color: context.colors.primary, width: 1.5),
         ),
       ),
     );

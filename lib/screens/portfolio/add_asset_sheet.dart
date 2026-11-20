@@ -126,7 +126,7 @@ class _AddAssetSheetState extends ConsumerState<_AddAssetSheet> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('$ticker 추가 완료'),
-            backgroundColor: AppColors.positive,
+            backgroundColor: context.colors.positive,
             duration: const Duration(seconds: 3),
           ),
         );
@@ -136,7 +136,7 @@ class _AddAssetSheetState extends ConsumerState<_AddAssetSheet> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('저장 실패: $e'),
-            backgroundColor: AppColors.negative,
+            backgroundColor: context.colors.negative,
             duration: const Duration(seconds: 5),
           ),
         );
@@ -154,10 +154,10 @@ class _AddAssetSheetState extends ConsumerState<_AddAssetSheet> {
       lastDate: DateTime.now(),
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
-          colorScheme: const ColorScheme.dark(
-            primary: AppColors.primary,
-            surface: AppColors.surface,
-            onSurface: AppColors.textPrimary,
+          colorScheme: ColorScheme.dark(
+            primary: context.colors.primary,
+            surface: context.colors.surface,
+            onSurface: context.colors.textPrimary,
           ),
         ),
         child: child!,
@@ -183,8 +183,8 @@ class _AddAssetSheetState extends ConsumerState<_AddAssetSheet> {
       maxChildSize: 0.95,
       minChildSize: 0.5,
       builder: (_, controller) => Container(
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
+        decoration: BoxDecoration(
+          color: context.colors.surface,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: ListView(
@@ -198,17 +198,17 @@ class _AddAssetSheetState extends ConsumerState<_AddAssetSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: AppColors.border,
+                  color: context.colors.border,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
-            const Text(
+            Text(
               '자산 추가',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w800,
-                color: AppColors.textPrimary,
+                color: context.colors.textPrimary,
               ),
             ),
             const SizedBox(height: 24),
@@ -232,19 +232,19 @@ class _AddAssetSheetState extends ConsumerState<_AddAssetSheet> {
                   child: FilledButton(
                     onPressed: _lookingUp ? null : _lookupTicker,
                     style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: AppColors.background,
+                      backgroundColor: context.colors.primary,
+                      foregroundColor: context.colors.onPrimary,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
                       ),
                     ),
                     child: _lookingUp
-                        ? const SizedBox(
+                        ? SizedBox(
                             width: 18,
                             height: 18,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: AppColors.background,
+                              color: context.colors.background,
                             ),
                           )
                         : const Text(
@@ -261,7 +261,7 @@ class _AddAssetSheetState extends ConsumerState<_AddAssetSheet> {
               const SizedBox(height: 8),
               Text(
                 _lookupError!,
-                style: const TextStyle(color: AppColors.negative, fontSize: 12),
+                style: TextStyle(color: context.colors.negative, fontSize: 12),
               ),
             ],
             if (_tickerInfo != null) ...[
@@ -269,21 +269,21 @@ class _AddAssetSheetState extends ConsumerState<_AddAssetSheet> {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceHigh,
+                  color: context.colors.surfaceHigh,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.primaryDim),
+                  border: Border.all(color: context.colors.primaryDim),
                 ),
                 child: Row(
                   children: [
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: AppColors.primaryDim,
+                        color: context.colors.primaryDim,
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.check_circle_outline_rounded,
-                        color: AppColors.primary,
+                        color: context.colors.primary,
                         size: 18,
                       ),
                     ),
@@ -294,17 +294,17 @@ class _AddAssetSheetState extends ConsumerState<_AddAssetSheet> {
                         children: [
                           Text(
                             _tickerInfo!['name'] ?? '',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.w700,
                               fontSize: 14,
-                              color: AppColors.textPrimary,
+                              color: context.colors.textPrimary,
                             ),
                           ),
                           Text(
                             '${_tickerInfo!['type'] ?? ''}${_tickerInfo!['sector'] != null ? ' · ${_tickerInfo!['sector']}' : ''}',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
-                              color: AppColors.textSecondary,
+                              color: context.colors.textSecondary,
                             ),
                           ),
                         ],
@@ -321,31 +321,33 @@ class _AddAssetSheetState extends ConsumerState<_AddAssetSheet> {
             const SizedBox(height: 8),
             accountsAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) =>
-                  Text('계좌 로딩 실패', style: TextStyle(color: AppColors.negative)),
+              error: (e, _) => Text(
+                '계좌 로딩 실패',
+                style: TextStyle(color: context.colors.negative),
+              ),
               data: (accounts) => Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14),
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceHigh,
+                  color: context.colors.surfaceHigh,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.border),
+                  border: Border.all(color: context.colors.border),
                 ),
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<Account>(
                     value: _selectedAccount,
                     isExpanded: true,
-                    dropdownColor: AppColors.surfaceHigh,
-                    hint: const Text(
+                    dropdownColor: context.colors.surfaceHigh,
+                    hint: Text(
                       '계좌 선택',
-                      style: TextStyle(color: AppColors.textSecondary),
+                      style: TextStyle(color: context.colors.textSecondary),
                     ),
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
+                    style: TextStyle(
+                      color: context.colors.textPrimary,
                       fontSize: 14,
                     ),
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.keyboard_arrow_down_rounded,
-                      color: AppColors.textSecondary,
+                      color: context.colors.textSecondary,
                     ),
                     items: accounts
                         .map(
@@ -421,22 +423,22 @@ class _AddAssetSheetState extends ConsumerState<_AddAssetSheet> {
                   vertical: 16,
                 ),
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceHigh,
+                  color: context.colors.surfaceHigh,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.border),
+                  border: Border.all(color: context.colors.border),
                 ),
                 child: Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.calendar_today_rounded,
-                      color: AppColors.textSecondary,
+                      color: context.colors.textSecondary,
                       size: 18,
                     ),
                     const SizedBox(width: 10),
                     Text(
                       DateFormat('yyyy년 MM월 dd일').format(_date),
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
+                      style: TextStyle(
+                        color: context.colors.textPrimary,
                         fontSize: 14,
                       ),
                     ),
@@ -453,21 +455,21 @@ class _AddAssetSheetState extends ConsumerState<_AddAssetSheet> {
               child: FilledButton(
                 onPressed: _canSubmit ? _submit : null,
                 style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: AppColors.background,
-                  disabledBackgroundColor: AppColors.border,
-                  disabledForegroundColor: AppColors.textSecondary,
+                  backgroundColor: context.colors.primary,
+                  foregroundColor: context.colors.onPrimary,
+                  disabledBackgroundColor: context.colors.border,
+                  disabledForegroundColor: context.colors.textSecondary,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
                 ),
                 child: _submitting
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 22,
                         height: 22,
                         child: CircularProgressIndicator(
                           strokeWidth: 2.5,
-                          color: AppColors.background,
+                          color: context.colors.background,
                         ),
                       )
                     : const Text(
@@ -494,10 +496,10 @@ class _Label extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 13,
         fontWeight: FontWeight.w600,
-        color: AppColors.textSecondary,
+        color: context.colors.textSecondary,
       ),
     );
   }
@@ -531,27 +533,27 @@ class _DarkTextField extends StatelessWidget {
       textCapitalization: textCapitalization,
       onChanged: onChanged,
       onSubmitted: onSubmitted,
-      style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+      style: TextStyle(color: context.colors.textPrimary, fontSize: 14),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: AppColors.textSecondary),
+        hintStyle: TextStyle(color: context.colors.textSecondary),
         filled: true,
-        fillColor: AppColors.surfaceHigh,
+        fillColor: context.colors.surfaceHigh,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 14,
           vertical: 16,
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.border),
+          borderSide: BorderSide(color: context.colors.border),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.border),
+          borderSide: BorderSide(color: context.colors.border),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+          borderSide: BorderSide(color: context.colors.primary, width: 1.5),
         ),
       ),
     );
