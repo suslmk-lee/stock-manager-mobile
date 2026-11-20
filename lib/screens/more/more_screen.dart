@@ -9,10 +9,12 @@ import '../../providers/dividend_provider.dart';
 import '../../providers/portfolio_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../services/cache_service.dart';
+import '../../services/kakao_probe.dart';
 import '../../widgets/ui/app_icon.dart';
 import '../../widgets/ui/app_shell.dart';
 import '../../widgets/ui/controls.dart';
 import '../../widgets/ui/surfaces.dart';
+import 'kakao_probe_screen.dart';
 import 'theme_sheet.dart';
 
 final appVersionProvider = FutureProvider<PackageInfo>(
@@ -45,6 +47,10 @@ class MoreScreen extends StatelessWidget {
             const SizedBox(height: 14),
             const _DataCard(),
             const SizedBox(height: 14),
+            if (KakaoProbe.supported) ...[
+              const _LabCard(),
+              const SizedBox(height: 14),
+            ],
             const _AboutCard(),
           ],
         ),
@@ -275,6 +281,31 @@ class _DataCard extends ConsumerWidget {
                   ? null
                   : () => _clear(context, ref),
               child: const Text('지우기'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 실험 중인 기능 (안드로이드만)
+class _LabCard extends StatelessWidget {
+  const _LabCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassCard(
+      padding: const EdgeInsets.fromLTRB(18, 16, 14, 6),
+      child: Column(
+        children: [
+          const CardHeader(glyph: AppGlyph.sparkle, title: '실험'),
+          const SizedBox(height: 6),
+          _SettingRow(
+            label: '카톡 배당 알림 시험',
+            hint: '1단계 · 알림 모양 기록',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const KakaoProbeScreen()),
             ),
           ),
         ],
