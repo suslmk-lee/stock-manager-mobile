@@ -234,7 +234,7 @@ class _PortfolioHero extends ConsumerWidget {
               if (!loading && t.pricedCount < t.assetCount) ...[
                 const SizedBox(height: 10),
                 Text(
-                  '현재가 ${t.assetCount}종목 중 ${t.pricedCount}종목 반영',
+                  '현재가·환율 ${t.assetCount}종목 중 ${t.pricedCount}종목 반영',
                   style: AppText.label(p, color: p.amber.s300),
                 ),
               ],
