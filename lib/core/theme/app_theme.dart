@@ -1,42 +1,63 @@
 import 'package:flutter/material.dart';
 import 'palette.dart';
+import 'themes.dart';
 import 'typography.dart';
 
-/// 예전 화면(추가·수정 시트 등)이 쓰는 색 상수.
-/// 기본 테마(블랙 · 민트) 토큰 값에 맞춰 두었다. 새 화면은 `context.pal` 을 쓴다.
+/// 예전 화면(추가·수정 시트 등)이 쓰던 색 이름을 지금 테마 색으로 옮긴 것.
+/// `context.colors.primary` 처럼 쓴다. 새 화면은 `context.pal` 을 쓴다.
 class AppColors {
+  final AppPalette p;
+
+  const AppColors(this.p);
+
   // 바탕
-  static const background = Color(0xFF060607); // ink-950
-  static const surface = Color(0xFF0D0D0E); // surface
-  static const surfaceHigh = Color(0xFF1B1B1C); // ink-700
+  Color get background => p.ink950;
+  Color get surface => p.surface;
+  Color get surfaceHigh => p.ink700;
 
   // 강조 (테마 강조색)
-  static const primary = Color(0xFF7DDFB0); // mint-400
-  static const primaryDim = Color(0x267DDFB0); // mint-400 / 15%
-  static const secondary = Color(0xFF38BDF8); // sky-400
-  static const secondaryDim = Color(0x2638BDF8);
+  Color get primary => p.mint.s400;
+  Color get primaryDim => p.mint.s400.withValues(alpha: 0.15);
+
+  /// 강조색 면 위 글자 (다크 = 어두운 바탕색, 라이트 = 흰색)
+  Color get onPrimary => p.isDark ? p.ink950 : p.paper;
+  Color get secondary => p.sky.s400;
+  Color get secondaryDim => p.sky.s400.withValues(alpha: 0.15);
 
   // 글자
-  static const textPrimary = Color(0xFFFFFFFF);
-  static const textSecondary = Color(0xFF9B9B9C); // zinc-400
+  Color get textPrimary => p.white;
+  Color get textSecondary => p.zinc.s400;
 
   // 상태: 오르면 강조색, 내리면 rose
-  static const positive = Color(0xFFA1E8C6); // mint-300
-  static const negative = Color(0xFFFB7185); // rose-400
+  Color get positive => p.mint.s300;
+  Color get negative => p.rose.s400;
 
-  // 테두리: 흰색 8%
-  static const border = Color(0x14FFFFFF);
+  // 테두리: 글자색 8%
+  Color get border => p.w(0.08);
+}
 
-  // Legacy compat
-  static const white = surface;
-  static const primaryLight = primaryDim;
-  static const cardBorder = border;
+extension AppColorsContext on BuildContext {
+  AppColors get colors => AppColors(pal);
 }
 
 class AppTheme {
   static ThemeData get dark => fromPalette(AppPalette.defaultDark);
 
+  static final _cache = <String, ThemeData>{};
+
+  /// 테마 목록의 테마 하나 → ThemeData (한 번 만든 것은 다시 쓴다)
+  static ThemeData of(AppThemeDef def) =>
+      _cache[def.id] ??= fromPalette(def.palette);
+
+  /// 주 버튼 색: 다크는 밝은 면 + 어두운 글자, 라이트는 강조색 면 + 흰 글자
+  /// (데스크톱 card-styles.css 의 라이트 테마 주 버튼과 같다)
+  static (Color bg, Color fg) primaryButtonColors(AppPalette p) =>
+      p.isDark ? (p.zinc.s100, p.ink950) : (p.mint.s400, p.paper);
+
   static ThemeData fromPalette(AppPalette p) {
+    final (buttonBg, buttonFg) = primaryButtonColors(p);
+    // 강조색 면 위 글자: 다크 테마는 강조색이 밝아서 어두운 글자, 라이트는 흰 글자
+    final onAccent = p.isDark ? p.ink950 : p.paper;
     final base = ThemeData(
       brightness: p.isDark ? Brightness.dark : Brightness.light,
       fontFamily: kSans,
@@ -56,11 +77,11 @@ class AppTheme {
       colorScheme: ColorScheme(
         brightness: p.isDark ? Brightness.dark : Brightness.light,
         primary: p.mint.s400,
-        onPrimary: p.ink950,
+        onPrimary: onAccent,
         secondary: p.sky.s400,
-        onSecondary: p.ink950,
+        onSecondary: onAccent,
         error: p.rose.s400,
-        onError: p.ink950,
+        onError: onAccent,
         surface: p.surface,
         onSurface: p.zinc.s100,
         surfaceContainerHighest: p.ink700,
@@ -116,8 +137,8 @@ class AppTheme {
       // 주 버튼 (.btn-primary): 알약형, 밝은 면 + 어두운 글자
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: p.zinc.s100,
-          foregroundColor: p.ink950,
+          backgroundColor: buttonBg,
+          foregroundColor: buttonFg,
           disabledBackgroundColor: p.w(0.12),
           disabledForegroundColor: p.zinc.s500,
           shape: const StadiumBorder(),
@@ -150,8 +171,8 @@ class AppTheme {
         style: IconButton.styleFrom(foregroundColor: p.zinc.s400),
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
-        backgroundColor: p.zinc.s100,
-        foregroundColor: p.ink950,
+        backgroundColor: buttonBg,
+        foregroundColor: buttonFg,
       ),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: p.surface,

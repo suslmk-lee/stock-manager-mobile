@@ -47,6 +47,30 @@ class CacheService {
     await prefs.remove(key);
   }
 
+  static bool _isCacheKey(String key) => key.startsWith(CacheKeys.prefix);
+
+  /// 저장된 캐시 항목 수와 크기 (UTF-8 바이트). 설정 값은 세지 않는다
+  Future<({int count, int bytes})> stats() async {
+    final prefs = await SharedPreferences.getInstance();
+    var count = 0, bytes = 0;
+    for (final key in prefs.getKeys().where(_isCacheKey)) {
+      final raw = prefs.get(key);
+      count++;
+      if (raw is String) bytes += utf8.encode(raw).length;
+    }
+    return (count: count, bytes: bytes);
+  }
+
+  /// 캐시만 모두 지운다 (설정 값은 남긴다). 지운 항목 수를 돌려준다
+  Future<int> clearAll() async {
+    final prefs = await SharedPreferences.getInstance();
+    final keys = prefs.getKeys().where(_isCacheKey).toList();
+    for (final key in keys) {
+      await prefs.remove(key);
+    }
+    return keys.length;
+  }
+
   // API 호출 성공 시 캐시 저장, 실패 시 캐시에서 복원 (캐시도 없으면 원래 에러)
   Future<T> fetchWithFallback<T>(
     String key, {
@@ -75,6 +99,8 @@ class CacheService {
 
 // 캐시 키 상수
 class CacheKeys {
+  /// 모든 캐시 키의 앞부분 (설정 값과 구분)
+  static const prefix = 'cache_';
   static const accounts = 'cache_accounts';
   static const assets = 'cache_assets';
   static const dividendStats = 'cache_dividend_stats';

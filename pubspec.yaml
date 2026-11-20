@@ -40,6 +40,7 @@ dependencies:
   shared_preferences: ^2.3.3
   flutter_slidable: ^3.1.2
   flutter_svg: ^2.3.4
+  package_info_plus: ^10.2.2
 
 dev_dependencies:
   flutter_test:
@@ -64,6 +65,7 @@ flutter:
   assets:
     - assets/brokers/
     - assets/branding/brand_mark.png
+    - assets/branding/intro_mark.png
     - assets/fonts/OFL-Pretendard.txt
     - assets/fonts/OFL-JetBrainsMono.txt
 

@@ -97,7 +97,7 @@ class _AccountSheetState extends ConsumerState<_AccountSheet> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('저장 실패: $e'),
-            backgroundColor: AppColors.negative,
+            backgroundColor: context.colors.negative,
           ),
         );
       }
@@ -115,8 +115,8 @@ class _AccountSheetState extends ConsumerState<_AccountSheet> {
       maxChildSize: 0.92,
       minChildSize: 0.5,
       builder: (_, controller) => Container(
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
+        decoration: BoxDecoration(
+          color: context.colors.surface,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: ListView(
@@ -129,17 +129,17 @@ class _AccountSheetState extends ConsumerState<_AccountSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: AppColors.border,
+                  color: context.colors.border,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
             Text(
               _isEditing ? '계좌 수정' : '계좌 추가',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w800,
-                color: AppColors.textPrimary,
+                color: context.colors.textPrimary,
               ),
             ),
             const SizedBox(height: 20),
@@ -240,8 +240,8 @@ class _SheetLabel extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 8),
       child: Text(
         text,
-        style: const TextStyle(
-          color: AppColors.textSecondary,
+        style: TextStyle(
+          color: context.colors.textSecondary,
           fontSize: 12,
           fontWeight: FontWeight.w700,
         ),
@@ -272,19 +272,19 @@ class _SheetTextField extends StatelessWidget {
       keyboardType: keyboardType,
       inputFormatters: inputFormatters,
       maxLines: maxLines,
-      style: const TextStyle(color: AppColors.textPrimary),
+      style: TextStyle(color: context.colors.textPrimary),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: AppColors.textSecondary),
+        hintStyle: TextStyle(color: context.colors.textSecondary),
         filled: true,
-        fillColor: AppColors.surfaceHigh,
+        fillColor: context.colors.surfaceHigh,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.primary),
+          borderSide: BorderSide(color: context.colors.primary),
         ),
       ),
     );
@@ -310,16 +310,20 @@ class _ChoiceButton extends StatelessWidget {
         height: 46,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: selected ? AppColors.primaryDim : AppColors.surfaceHigh,
+          color: selected
+              ? context.colors.primaryDim
+              : context.colors.surfaceHigh,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: selected ? AppColors.primary : AppColors.cardBorder,
+            color: selected ? context.colors.primary : context.colors.border,
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: selected ? AppColors.primary : AppColors.textSecondary,
+            color: selected
+                ? context.colors.primary
+                : context.colors.textSecondary,
             fontWeight: FontWeight.w800,
           ),
         ),
@@ -345,7 +349,7 @@ Future<void> deleteAccount(
         ),
         TextButton(
           onPressed: () => Navigator.pop(dialogContext, true),
-          child: const Text('삭제', style: TextStyle(color: AppColors.negative)),
+          child: Text('삭제', style: TextStyle(color: context.colors.negative)),
         ),
       ],
     ),
@@ -367,7 +371,7 @@ Future<void> deleteAccount(
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('삭제 실패: $e'),
-          backgroundColor: AppColors.negative,
+          backgroundColor: context.colors.negative,
         ),
       );
     }

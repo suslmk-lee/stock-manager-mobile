@@ -35,3 +35,5 @@ render app_icon_fg.svg app_icon_fg.png 1024      # 안드로이드 적응형 전
 render app_icon_mono.svg app_icon_mono.png 1024  # 안드로이드 13+ 테마 아이콘
 # 스플래시: 안드로이드 12 는 1152px 중 지름 768px 원 안만 보이므로 600px 로 가운데에
 render brand_mark.svg splash_logo.png 1152 600
+# 앱 안 시작 화면(IntroGate)의 마크: 150dp 를 고밀도 화면에서도 선명하게
+render brand_mark.svg intro_mark.png 600

@@ -17,6 +17,12 @@ enum AppGlyph {
   podium,
   layers,
   history,
+  more,
+  palette,
+  font,
+  box,
+  info,
+  sparkle,
 }
 
 // [선, 면] — 이 파일의 상수만 넣는다 (밖에서 받은 값을 SVG 에 넣지 않는다)
@@ -60,6 +66,34 @@ const Map<AppGlyph, List<String>> _paths = {
   AppGlyph.history: [
     '<path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3L4.5 9"/><path d="M4.5 4.5V9H9"/><path d="M12 8v4.5l3 1.8"/>',
     '<path d="M12 4.5a7.5 7.5 0 0 1 7.5 7.5H12z"/>',
+  ],
+  // 더보기: 점 셋 (면 = 가운데 점)
+  AppGlyph.more: [
+    '<circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/>',
+    '<circle cx="12" cy="12" r="2.6"/>',
+  ],
+  // 아래 넷은 데스크톱 appIcons.tsx 와 같은 그림 (palette · font · box)
+  AppGlyph.palette: [
+    '<path d="M12 3.5a8.5 8.5 0 0 0 0 17c1.1 0 1.7-.7 1.7-1.6 0-1.2-1.2-1.6-1.2-2.8 0-1 .8-1.6 1.7-1.6h2.3a4 4 0 0 0 4-4c0-4.1-3.8-7-8.5-7z"/><circle cx="7.5" cy="11.5" r="1"/><circle cx="10" cy="7.5" r="1"/><circle cx="14.5" cy="7.5" r="1"/>',
+    '<circle cx="7.5" cy="11.5" r="2.4"/>',
+  ],
+  AppGlyph.font: [
+    '<path d="M3.5 18.5 8.5 5.5l5 13M5.3 14h6.4"/><circle cx="17.5" cy="15.5" r="3"/><path d="M20.5 12.5v6"/>',
+    '<circle cx="17.5" cy="15.5" r="3"/>',
+  ],
+  AppGlyph.box: [
+    '<path d="M12 3.5l7.5 4.3v8.4L12 20.5l-7.5-4.3V7.8z"/><path d="M12 12l7.5-4.2M12 12v8.5M12 12 4.5 7.8"/>',
+    '<path d="M12 3.5l7.5 4.3L12 12 4.5 7.8z"/>',
+  ],
+  // 앱 정보: 원 안의 i (면 = 원 위쪽 절반)
+  AppGlyph.info: [
+    '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5"/><circle cx="12" cy="7.8" r=".6"/>',
+    '<path d="M3.5 12a8.5 8.5 0 0 1 17 0z"/>',
+  ],
+  // 시작 화면: 반짝임 (면 = 큰 별)
+  AppGlyph.sparkle: [
+    '<path d="M10 4.5l1.6 4.4 4.4 1.6-4.4 1.6L10 16.5l-1.6-4.4L4 10.5l4.4-1.6z"/><path d="M17.5 14.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/>',
+    '<path d="M10 4.5l1.6 4.4 4.4 1.6-4.4 1.6L10 16.5l-1.6-4.4L4 10.5l4.4-1.6z"/>',
   ],
 };
 

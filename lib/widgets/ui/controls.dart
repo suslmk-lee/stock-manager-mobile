@@ -117,7 +117,8 @@ class SubPageTabs extends StatelessWidget {
   }
 }
 
-/// 작은 주 버튼 (.btn-primary): 흰색 세로 그라데이션 + 어두운 글자, 알약형
+/// 작은 주 버튼 (.btn-primary): 흰색 세로 그라데이션 + 어두운 글자, 알약형.
+/// 라이트 테마에서는 검정 버튼이 무거워 보여 강조색 면 + 흰 글자 (데스크톱과 같다)
 class PrimaryPillButton extends StatelessWidget {
   final String label;
   final IconData? icon;
@@ -133,17 +134,20 @@ class PrimaryPillButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.pal;
+    final fg = p.isDark ? p.ink950 : p.paper;
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(999),
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [p.white, p.zinc.s200],
+          colors: p.isDark
+              ? [p.white, p.zinc.s200]
+              : [p.mint.s400, p.mint.s500],
         ),
         boxShadow: [
           BoxShadow(
-            color: p.w(0.35),
+            color: p.isDark ? p.w(0.35) : p.mint.s400.withValues(alpha: 0.7),
             offset: const Offset(0, 8),
             blurRadius: 20,
             spreadRadius: -10,
@@ -161,7 +165,7 @@ class PrimaryPillButton extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (icon != null) ...[
-                  Icon(icon, size: 15, color: p.ink950),
+                  Icon(icon, size: 15, color: fg),
                   const SizedBox(width: 3),
                 ],
                 Text(
@@ -170,7 +174,7 @@ class PrimaryPillButton extends StatelessWidget {
                     fontFamily: kSans,
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: p.ink950,
+                    color: fg,
                   ),
                 ),
               ],
