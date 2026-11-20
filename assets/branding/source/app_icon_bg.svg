@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-240.94 -240.94 1505.88 1505.88">
+<defs>
+<linearGradient id="C4-bg" gradientUnits="userSpaceOnUse" x1="0" y1="100" x2="0" y2="924"><stop offset="0" stop-color="#16263a"/><stop offset="1" stop-color="#070b11"/></linearGradient>
+<radialGradient id="C4-glow" gradientUnits="userSpaceOnUse" cx="798.72" cy="225.28" r="614.4"><stop offset="0" stop-color="#7ddfb0" stop-opacity="0.28"/><stop offset="1" stop-color="#7ddfb0" stop-opacity="0"/></radialGradient>
+<linearGradient id="C4-sheen" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="1024"><stop offset="0" stop-color="#fff" stop-opacity="0.10"/><stop offset="0.45" stop-color="#fff" stop-opacity="0"/></linearGradient>
+</defs>
+<rect x="-240.94" y="-240.94" width="1505.88" height="1505.88" fill="url(#C4-bg)"/>
+<rect x="-240.94" y="-240.94" width="1505.88" height="1505.88" fill="url(#C4-glow)"/>
+<rect x="-240.94" y="-240.94" width="1505.88" height="1505.88" fill="url(#C4-sheen)"/>
+</svg>
