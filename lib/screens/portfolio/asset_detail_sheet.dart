@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../../core/fx.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/asset.dart';
 import '../../providers/account_provider.dart';
@@ -188,9 +189,7 @@ class AssetDetailSheet extends ConsumerWidget {
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               Text(
-                                price.currency == 'KRW'
-                                    ? '₩${NumberFormat('#,###').format(price.price.round())}'
-                                    : '\$${NumberFormat('#,##0.00').format(price.price)}',
+                                formatCurrency(price.price, price.currency),
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w700,
@@ -285,12 +284,9 @@ class _HoldingRow extends ConsumerWidget {
     required this.onUpdated,
   });
 
-  String _formatValue(double value, String currency) {
-    if (currency == 'KRW') {
-      return '₩${NumberFormat('#,###').format(value.round())}';
-    }
-    return '\$${NumberFormat('#,##0.00').format(value)}';
-  }
+  // 종목 통화 그대로 (엔화·유로 종목도 $ 로 보이지 않게)
+  String _formatValue(double value, String currency) =>
+      formatCurrency(value, currency);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -396,7 +392,7 @@ class _HoldingRow extends ConsumerWidget {
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
               decoration: InputDecoration(
-                labelText: '평균단가 (${isKorean ? '₩' : '\$'})',
+                labelText: '평균단가 (${currencySymbol(currencyOfTicker(ticker))})',
                 border: const OutlineInputBorder(),
               ),
             ),

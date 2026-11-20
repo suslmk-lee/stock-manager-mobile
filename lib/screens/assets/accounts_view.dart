@@ -6,7 +6,6 @@ import '../../core/theme/typography.dart';
 import '../../models/account.dart';
 import '../../providers/account_provider.dart';
 import '../../providers/asset_provider.dart';
-import '../../providers/dividend_provider.dart';
 import '../../providers/portfolio_provider.dart';
 import '../../providers/price_provider.dart';
 import '../../widgets/error_retry.dart';
@@ -46,7 +45,7 @@ class AccountsView extends ConsumerWidget {
     final accountsAsync = ref.watch(accountsProvider);
     final assetsAsync = ref.watch(assetsProvider);
     final pricesAsync = ref.watch(allTickerPricesProvider);
-    final rate = ref.watch(exchangeRateProvider).valueOrNull ?? fallbackUsdKrw;
+    final fx = ref.watch(fxRatesProvider);
 
     Future<void> refresh() async {
       ref.invalidate(accountsProvider);
@@ -65,8 +64,8 @@ class AccountsView extends ConsumerWidget {
     }
 
     final prices = pricesAsync.valueOrNull ?? const {};
-    final pricesLoading =
-        pricesAsync.valueOrNull == null && !pricesAsync.hasError;
+    final all = ref.watch(portfolioProvider(null)).valueOrNull;
+    final pricesLoading = all?.pricesLoading ?? true;
     final lines = [
       for (final a in accounts)
         _AccountLine(
@@ -74,19 +73,17 @@ class AccountsView extends ConsumerWidget {
           buildPortfolio(
             assets: assets,
             prices: prices,
-            rate: rate,
+            fx: fx,
             accountId: a.id,
           ).totals,
-          rate,
+          fx.usdKrw,
         ),
     ]..sort((a, b) => b.sortKrw.compareTo(a.sortKrw));
     final domestic = lines.where((l) => !l.isInternational).toList();
     final international = lines.where((l) => l.isInternational).toList();
-    final total = buildPortfolio(
-      assets: assets,
-      prices: prices,
-      rate: rate,
-    ).totals;
+    final total =
+        all?.totals ??
+        buildPortfolio(assets: assets, prices: prices, fx: fx).totals;
     final holdingCount = lines.fold<int>(0, (s, l) => s + l.totals.assetCount);
 
     return RefreshIndicator(

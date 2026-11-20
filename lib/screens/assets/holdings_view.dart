@@ -50,7 +50,7 @@ class HoldingsView extends ConsumerWidget {
             buildPortfolio(
               assets: ref.read(assetsProvider).valueOrNull ?? const [],
               prices: ref.read(allTickerPricesProvider).valueOrNull ?? const {},
-              rate: all?.rate ?? fallbackUsdKrw,
+              fx: ref.read(fxRatesProvider),
               accountId: a.id,
             ),
           ),

@@ -1,4 +1,5 @@
 import 'package:intl/intl.dart';
+import 'fx.dart';
 
 final _krw = NumberFormat('#,###');
 final _usd = NumberFormat('#,##0.00');
@@ -10,8 +11,9 @@ bool isKrwTicker(String ticker) =>
 
 String fmtKrw(num v) => '${v < 0 ? '−' : ''}₩${_krw.format(v.abs().round())}';
 String fmtUsd(num v) => '${v < 0 ? '−' : ''}\$${_usd.format(v.abs())}';
-String fmtMoney(num v, String currency) =>
-    currency == 'KRW' ? fmtKrw(v) : fmtUsd(v);
+
+/// 종목·배당 통화 그대로 (₩ · $ · ¥ · € …)
+String fmtMoney(num v, String currency) => formatCurrency(v, currency);
 
 /// +₩1,234 / −$5.00
 String fmtSignedMoney(num v, String currency) =>
